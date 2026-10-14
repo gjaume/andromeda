@@ -4,7 +4,13 @@ from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import display
 
-from .models import CorreoFactura, FacturaRecibida, LineaFactura, Proveedor
+from .models import CorreoFactura, Empresa, FacturaRecibida, LineaFactura, Proveedor
+
+
+@admin.register(Empresa)
+class EmpresaAdmin(ModelAdmin):
+    list_display = ("nombre", "cif", "carpeta_drive")
+    search_fields = ("nombre", "cif")
 
 
 @admin.register(Proveedor)
@@ -62,6 +68,32 @@ class DuplicadaFilter(admin.SimpleListFilter):
         return queryset
 
 
+class FechaRellenaFilter(admin.SimpleListFilter):
+    """Sí/no según un campo de fecha esté relleno (p. ej. subida a Drive, contabilizada)."""
+
+    campo = ""
+
+    def lookups(self, request, model_admin):
+        return [("si", "Sí"), ("no", "No")]
+
+    def queryset(self, request, queryset):
+        if self.value() in ("si", "no"):
+            return queryset.filter(**{f"{self.campo}__isnull": self.value() == "no"})
+        return queryset
+
+
+class SubidaADriveFilter(FechaRellenaFilter):
+    title = "subida a Drive"
+    parameter_name = "en_drive"
+    campo = "subida_a_drive_en"
+
+
+class ContabilizadaFilter(FechaRellenaFilter):
+    title = "contabilizada"
+    parameter_name = "contabilizada"
+    campo = "contabilizada_en"
+
+
 class FacturaInline(TabularInline):
     model = FacturaRecibida
     fields = (abrir_archivo, "tamano")
@@ -106,6 +138,7 @@ class FacturaRecibidaAdmin(ModelAdmin):
     list_display = (
         "recibida_en",
         "proveedor",
+        "empresa",
         abrir_archivo,
         "numero_factura",
         "fecha_factura",
@@ -113,10 +146,25 @@ class FacturaRecibidaAdmin(ModelAdmin):
         "moneda",
         "extraccion_estado",
         "duplicada_de",
+        "subida_a_drive_en",
+        "contabilizada_en",
     )
-    list_filter = ("extraccion_estado", DuplicadaFilter, "moneda", "tipo", "proveedor")
+    list_filter = (
+        "extraccion_estado",
+        "empresa",
+        DuplicadaFilter,
+        SubidaADriveFilter,
+        ContabilizadaFilter,
+        "moneda",
+        "tipo",
+        "proveedor",
+    )
     search_fields = ("nombre_archivo", "numero_factura", "correo__asunto")
-    readonly_fields = [abrir_archivo, *(f.name for f in FacturaRecibida._meta.fields)]
+    # La empresa se puede corregir a mano si no se detecta en el PDF
+    readonly_fields = [
+        abrir_archivo,
+        *(f.name for f in FacturaRecibida._meta.fields if f.name != "empresa"),
+    ]
     inlines = [LineaInline]
     actions = ["volver_a_extraer"]
 

@@ -174,3 +174,30 @@ def test_formato_de_cantidades(valor, texto):
     from apps.administracion.templatetags.facturas import numero
 
     assert numero(valor) == texto
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperada"),
+    [
+        ("Bill to: Admin\nVAT Number: B-57.804.478", "ANDROMEDA SOLUTIONS"),
+        ("Cliente: Andrómeda   Tech Group, S.L.", "ANDROMEDA TECH GROUP"),
+        ("Cliente: Andromeda Solutions SL\nNIF B16622458", "ANDROMEDA TECH GROUP"),  # manda el CIF
+        ("Cliente: Otra empresa", None),
+        ("NIF B57804478 y B16622458", None),  # ambigua
+    ],
+)
+def test_detectar_empresa(db, texto, esperada):
+    from apps.administracion.extraccion.servicio import detectar_empresa
+    from apps.administracion.models import Empresa
+
+    empresa = detectar_empresa(texto, list(Empresa.objects.all()))
+    assert (empresa.nombre if empresa else None) == esperada
+
+
+def test_los_anexos_no_son_un_error(extractor, factura):
+    from apps.administracion.extraccion import NoEsFactura
+
+    extractor.datos = NoEsFactura("No es una factura: es un anexo")
+    extraer_datos(factura)
+    assert (factura.tipo, factura.extraccion_estado) == ("anexo", "ok")
+    assert factura.total is None

@@ -28,6 +28,7 @@ urlpatterns = [
         views.SincronizarFacturasView.as_view(),
         name="facturas_sincronizar",
     ),
+    path("facturas/subir-a-drive/", views.SubirADriveView.as_view(), name="facturas_subir_drive"),
     path("facturas/<int:pk>/", views.FacturaDetalleView.as_view(), name="factura_detalle"),
     path("facturas/<int:pk>/extraer/", views.FacturaExtraerView.as_view(), name="factura_extraer"),
     path("facturas/<int:pk>/archivo/", views.FacturaArchivoView.as_view(), name="factura_archivo"),

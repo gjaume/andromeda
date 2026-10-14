@@ -12,13 +12,13 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th scope="col">Recibida</th><th scope="col">Proveedor</th><th scope="col">Factura</th><th scope="col" class="num">Total</th><th scope="col"><span class="sr-only">Detalle</span></th></tr>
+        <tr><th scope="col">Recibida</th><th scope="col">Proveedor</th><th scope="col">Factura</th><th scope="col" class="num">Total</th><th scope="col">Contabilidad</th><th scope="col"><span class="sr-only">Detalle</span></th></tr>
       </thead>
       <tbody>
         {% for f in facturas %}
           <tr{% if f.duplicada_de %} class="is-duplicate"{% endif %}>
             <td class="nowrap">{{ f.recibida_en|date:"d/m/Y H:i" }}</td>
-            <td>{{ f.proveedor.nombre }}</td>
+            <td>{{ f.proveedor.nombre }}{% if f.empresa %}<br><span class="muted small">→ {{ f.empresa.nombre }}</span>{% endif %}</td>
             <td>
               <a href="{% url 'administracion:factura_archivo' f.pk %}" target="_blank" rel="noopener">{{ f.nombre_archivo }}</a>
               {% if f.subida_a_mano %}<span class="tag" title="Subida por {{ f.subida_por.email|default:'—' }}">subida a mano</span>{% endif %}
@@ -30,6 +30,7 @@
               {% if f.total is not None %}{{ f.total|dinero:f.moneda }}{% endif %}
               {% if f.extraccion_estado != "ok" %}<br>{% include "administracion/_estado_extraccion.html" with factura=f %}{% endif %}
             </td>
+            <td class="nowrap">{% include "administracion/_contabilidad.html" with factura=f %}</td>
             <td class="nowrap"><a href="{% url 'administracion:factura_detalle' f.pk %}">Detalle</a></td>
           </tr>
         {% endfor %}

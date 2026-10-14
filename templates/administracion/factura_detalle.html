@@ -24,10 +24,12 @@
     <div class="total"><dt>Total</dt><dd>{{ factura.total|dinero:factura.moneda }}</dd></div>
   </dl>
   <dl class="mail-summary">
+    <dt>Emitida a</dt><dd>{{ factura.empresa.nombre|default:"Sin identificar" }}</dd>
     <dt>Moneda</dt><dd>{{ factura.moneda|default:"—" }}</dd>
     <dt>Recibida</dt><dd>{{ factura.recibida_en|date:"d/m/Y H:i" }}</dd>
     <dt>Correo</dt><dd><a href="{{ factura.correo.gmail_url }}" target="_blank" rel="noopener">{{ factura.correo.asunto|default:"(sin asunto)" }}</a></dd>
     <dt>Fichero</dt><dd>{{ factura.nombre_archivo }}{% if factura.subida_a_mano %} <span class="tag">subida a mano</span>{% endif %}</dd>
+    <dt>Contabilidad</dt><dd>{% include "administracion/_contabilidad.html" %}</dd>
     <dt>Extracción</dt><dd>{% include "administracion/_estado_extraccion.html" %}{% if factura.extraida_en %} <span class="muted small">{{ factura.extraida_en|date:"d/m/Y H:i" }}</span>{% endif %}</dd>
   </dl>
 </section>

@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
 
-from ..models import FacturaRecibida, LineaFactura
-from .base import DatosFactura, Documento, ExtraccionError, registro
+from ..models import Empresa, FacturaRecibida, LineaFactura
+from .base import DatosFactura, Documento, ExtraccionError, NoEsFactura, registro
 
 logger = logging.getLogger(__name__)
 
@@ -37,25 +39,55 @@ def comprobar(datos: DatosFactura) -> list[str]:
     return avisos
 
 
-def leer(factura: FacturaRecibida) -> DatosFactura:
+def documento(factura: FacturaRecibida) -> Documento:
+    with factura.archivo.open("rb") as fichero:
+        return Documento(fichero.read(), factura.nombre_archivo)
+
+
+def leer(factura: FacturaRecibida, doc: Documento | None = None) -> DatosFactura:
     """Extrae los datos sin guardarlos (para probar extractores)."""
     clave = factura.proveedor.extractor
     if clave not in registro:
         raise ExtraccionError(f"El proveedor no tiene un extractor válido ({clave or 'vacío'})")
-    with factura.archivo.open("rb") as fichero:
-        doc = Documento(fichero.read(), factura.nombre_archivo)
-    return registro[clave].extraer(doc)
+    return registro[clave].extraer(doc or documento(factura))
+
+
+def _normalizar(texto: str) -> str:
+    sin_acentos = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    return re.sub(r"\s+", " ", sin_acentos).lower()
+
+
+def detectar_empresa(texto: str, empresas: list[Empresa]) -> Empresa | None:
+    """Empresa del grupo a la que va emitida: por su CIF y, si no aparece, por su nombre.
+
+    None si no aparece ninguna o aparecen varias sin forma de decidir.
+    """
+    compacto = re.sub(r"[\s.\-]", "", texto).upper()
+    por_cif = [e for e in empresas if e.cif and e.cif.upper() in compacto]
+    if por_cif:
+        return por_cif[0] if len(por_cif) == 1 else None
+    normal = _normalizar(texto)
+    por_nombre = [e for e in empresas if any(_normalizar(n) in normal for n in e.nombres)]
+    return por_nombre[0] if len(por_nombre) == 1 else None
 
 
 def extraer_datos(factura: FacturaRecibida) -> FacturaRecibida:
     """Rellena los datos extraídos de la factura. Nunca lanza: el fallo queda en su estado."""
     Estado = FacturaRecibida.Extraccion
-    datos, avisos = None, []
+    datos, avisos, anexo, empresa = None, [], False, None
+    try:
+        doc = documento(factura)
+        empresa = detectar_empresa(doc.texto, list(Empresa.objects.all()))
+    except Exception:  # el PDF no se puede leer: lo dirá el extractor, si lo hay
+        logger.warning("No se pudo leer el texto de la factura %s", factura.pk, exc_info=True)
+        doc = None
     if not factura.proveedor.extractor:
         estado, detalle = Estado.SIN_EXTRACTOR, ""
     else:
         try:
-            datos = leer(factura)
+            datos = leer(factura, doc)
+        except NoEsFactura as exc:
+            estado, detalle, anexo = Estado.OK, str(exc), True
         except ExtraccionError as exc:
             estado, detalle = Estado.ERROR, str(exc)
         except Exception as exc:  # un PDF raro no debe parar la sincronización
@@ -72,6 +104,8 @@ def extraer_datos(factura: FacturaRecibida) -> FacturaRecibida:
         factura.extraccion_estado = estado
         factura.extraccion_detalle = detalle
         factura.extraida_en = timezone.now()
+        # Si no se reconoce, se conserva la que hubiera (p. ej. asignada a mano en el admin)
+        factura.empresa = empresa or factura.empresa
         if datos:
             factura.tipo = datos.tipo
             factura.numero_factura = datos.numero[:100]
@@ -95,6 +129,8 @@ def extraer_datos(factura: FacturaRecibida) -> FacturaRecibida:
         else:
             for campo in ("tipo", "numero_factura", "moneda"):
                 setattr(factura, campo, "")
+            if anexo:
+                factura.tipo = FacturaRecibida.Tipo.ANEXO
             for campo in ("fecha_factura", "base_imponible", "impuestos", "total"):
                 setattr(factura, campo, None)
         if not factura.numero_factura:

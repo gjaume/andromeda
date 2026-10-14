@@ -46,11 +46,19 @@ class DatosFactura:
     base_imponible: Decimal | None = None
     impuestos: Decimal | None = None
     tipo: str = "factura"  # "factura", "abono" (rectificativa) o "recibo" (justificante de pago)
+    # (los anexos no devuelven DatosFactura: el extractor lanza NoEsFactura)
     lineas: list[Linea] = field(default_factory=list)
 
 
 class ExtraccionError(Exception):
     """El PDF no tiene el formato esperado o falta un dato imprescindible."""
+
+
+class NoEsFactura(ExtraccionError):
+    """El PDF se reconoce, pero no es una factura (p. ej. un anexo con el detalle de consumo).
+
+    No es un error: el documento queda como tipo "anexo" y no cuenta como gasto.
+    """
 
 
 # --- Documento ------------------------------------------------------------------------------

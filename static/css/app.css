@@ -172,6 +172,10 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .estado-revisar { background: #FCE8B2; }
 .estado-error { background: #F6D5D3; color: var(--danger); }
 .estado-ok { background: #D6EBDF; color: var(--ok); }
+.checks { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+.check { display: inline-block; padding: 0 0.45em; font-size: 0.75rem; border-radius: 3px; border: 1px solid var(--line); color: var(--rope); text-decoration: none; }
+.check.is-done { background: #D6EBDF; border-color: #D6EBDF; color: var(--ok); font-weight: 700; }
+a.check:hover { text-decoration: underline; }
 .is-duplicate td { color: var(--rope); }
 .msg-warning { border-left-color: var(--signal); }
 .actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }

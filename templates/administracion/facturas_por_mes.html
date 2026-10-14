@@ -8,6 +8,12 @@
   <select id="f-anio" name="anio" onchange="this.form.submit()">
     {% for a in anios %}<option value="{{ a }}" {% if a == anio %}selected{% endif %}>{{ a }}</option>{% endfor %}
   </select>
+  <label for="f-empresa">Empresa</label>
+  <select id="f-empresa" name="empresa" onchange="this.form.submit()">
+    <option value="">Todas</option>
+    {% for e in empresas %}<option value="{{ e.pk }}" {% if e == empresa_actual %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+    <option value="ninguna" {% if empresa_actual == "ninguna" %}selected{% endif %}>Sin identificar</option>
+  </select>
   <label for="f-fecha">Mes según</label>
   <select id="f-fecha" name="fecha" onchange="this.form.submit()">
     {% for valor, nombre in criterios_fecha.items %}<option value="{{ valor }}" {% if valor == criterio_fecha %}selected{% endif %}>{{ nombre }}</option>{% endfor %}
@@ -19,7 +25,7 @@
   <noscript><button type="submit" class="button-secondary">Ver</button></noscript>
 </form>
 
-<p class="lede">Cada casilla verde indica que tenemos factura de ese proveedor ese mes, con lo que suma. {% if criterio_fecha == "correo" %}El mes es el de la fecha en que llegó el correo.{% else %}El mes es el de la fecha de emisión de la factura; si aún no se ha podido leer del PDF, se usa la del correo.{% endif %} Púlsala para ver las facturas. Los abonos restan; no se cuentan los recibos de pago ni las facturas duplicadas. Cada moneda se suma por separado.</p>
+<p class="lede">Cada casilla verde indica que tenemos factura de ese proveedor ese mes, con lo que suma. {% if criterio_fecha == "correo" %}El mes es el de la fecha en que llegó el correo.{% else %}El mes es el de la fecha de emisión de la factura; si aún no se ha podido leer del PDF, se usa la del correo.{% endif %} Púlsala para ver las facturas. Los abonos restan; no se cuentan los recibos de pago, los anexos ni las facturas duplicadas. Cada moneda se suma por separado.</p>
 
 {% if filas %}
   <div class="table-wrap">
@@ -38,7 +44,7 @@
             {% for celda in fila.meses %}
               <td class="{% if celda.futuro %}is-future{% endif %}{% if celda.numero == mes_en_curso %} is-current{% endif %}">
                 {% if celda.facturas %}
-                  <a class="tick" href="{% url 'administracion:facturas' %}?proveedor={{ fila.proveedor.pk }}&amp;mes={{ anio }}-{{ celda.numero|stringformat:'02d' }}{% if criterio_fecha != "factura" %}&amp;fecha={{ criterio_fecha }}{% endif %}" title="{{ celda.facturas }} factura{{ celda.facturas|pluralize }}" aria-label="{{ fila.proveedor.nombre }}, {{ celda.nombre }}: {{ celda.facturas }} factura{{ celda.facturas|pluralize }}">
+                  <a class="tick" href="{% url 'administracion:facturas' %}?proveedor={{ fila.proveedor.pk }}{% if empresa_actual %}&amp;empresa={% if empresa_actual == "ninguna" %}ninguna{% else %}{{ empresa_actual.pk }}{% endif %}{% endif %}&amp;mes={{ anio }}-{{ celda.numero|stringformat:'02d' }}{% if criterio_fecha != "factura" %}&amp;fecha={{ criterio_fecha }}{% endif %}" title="{{ celda.facturas }} factura{{ celda.facturas|pluralize }}" aria-label="{{ fila.proveedor.nombre }}, {{ celda.nombre }}: {{ celda.facturas }} factura{{ celda.facturas|pluralize }}">
                     <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="currentColor"/><path d="M5.5 10.5l3 3 6-6.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     {% if celda.facturas > 1 %}<span class="tick-count">{{ celda.facturas }}</span>{% endif %}
                   </a>

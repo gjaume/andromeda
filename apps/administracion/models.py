@@ -12,6 +12,38 @@ def opciones_extractores():
     return [(clave, extractor.nombre) for clave, extractor in sorted(registro.items())]
 
 
+class Empresa(models.Model):
+    """Empresa del grupo a la que va emitida una factura (comparten el buzón de facturas)."""
+
+    nombre = models.CharField(max_length=200, unique=True)
+    cif = models.CharField("CIF / NIF", max_length=20, unique=True)
+    alias = models.TextField(
+        blank=True,
+        help_text="Otras formas en que aparece su nombre en las facturas, una por línea. "
+        "Se distinguen por el CIF y, si no aparece, por el nombre o estos alias.",
+    )
+    carpeta_drive = models.CharField(
+        "carpeta en Drive",
+        max_length=300,
+        blank=True,
+        help_text="Ruta desde la unidad compartida, separada por /, p. ej. "
+        "Administración/ANDROMEDA SOLUTIONS/Facturas recibidas AS. Dentro van las carpetas de "
+        "cada año. Vacío = no se suben a Drive.",
+    )
+
+    class Meta:
+        ordering = ["nombre"]
+        verbose_name = "empresa"
+        verbose_name_plural = "empresas"
+
+    def __str__(self) -> str:
+        return self.nombre
+
+    @property
+    def nombres(self) -> list[str]:
+        return [self.nombre, *filter(None, (a.strip() for a in self.alias.splitlines()))]
+
+
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=200, unique=True)
     cif = models.CharField("CIF / NIF", max_length=20, blank=True)
@@ -135,6 +167,10 @@ class FacturaRecibida(models.Model):
         FACTURA = "factura", "Factura"
         ABONO = "abono", "Factura rectificativa / abono"
         RECIBO = "recibo", "Recibo de pago"
+        ANEXO = "anexo", "Anexo (no es factura)"
+
+    # Ni los recibos (justifican una factura ya contada) ni los anexos son gasto
+    TIPOS_NO_GASTO = (Tipo.RECIBO, Tipo.ANEXO)
 
     class Extraccion(models.TextChoices):
         PENDIENTE = "pendiente", "Pendiente"
@@ -144,6 +180,14 @@ class FacturaRecibida(models.Model):
         SIN_EXTRACTOR = "sin_extractor", "Sin extractor"
 
     tipo = models.CharField(max_length=10, choices=Tipo.choices, blank=True)
+    empresa = models.ForeignKey(
+        Empresa,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="facturas",
+        help_text="A quién va emitida. Se detecta en el PDF por el CIF o el nombre.",
+    )
     numero_factura = models.CharField("nº de factura", max_length=100, blank=True)
     fecha_factura = models.DateField(null=True, blank=True)
     moneda = models.CharField(max_length=3, blank=True, help_text="Código ISO 4217: EUR, USD…")
@@ -170,6 +214,14 @@ class FacturaRecibida(models.Model):
         help_text="Factura original de la que esta es una copia.",
     )
 
+    # --- Copia en Google Drive para contabilidad (apps/administracion/drive.py) ---
+    drive_id = models.CharField("id en Drive", max_length=100, blank=True)
+    # MD5 del PDF: así lo identifica Drive (md5Checksum). Se calcula la primera vez que hace falta.
+    md5 = models.CharField("MD5", max_length=32, blank=True)
+    subida_a_drive_en = models.DateTimeField("subida a Drive", null=True, blank=True)
+    # Contabilidad la ha movido a la carpeta CONTABILIZADO de su año
+    contabilizada_en = models.DateTimeField("contabilizada", null=True, blank=True)
+
     objects = FacturaRecibidaQuerySet.as_manager()
 
     class Meta:
@@ -190,6 +242,10 @@ class FacturaRecibida(models.Model):
     @property
     def subida_a_mano(self) -> bool:
         return not self.gmail_part_id
+
+    @property
+    def drive_url(self) -> str:
+        return f"https://drive.google.com/file/d/{self.drive_id}/view" if self.drive_id else ""
 
 
 class LineaFactura(models.Model):

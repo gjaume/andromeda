@@ -94,6 +94,39 @@ El proceso lee el buzón sin que nadie inicie sesión, con una cuenta de servici
 
 El acceso es de solo lectura: el proceso no marca, mueve ni borra correos.
 
+### Copia en Google Drive para contabilidad
+
+Cada factura se emite a una de las empresas del grupo. La aplicación detecta a cuál leyendo en el PDF su CIF o, si no aparece, su nombre. Las empresas se gestionan en el admin.
+Cada empresa tiene una carpeta en Drive, dentro de la cual hay una subcarpeta por año, y cada año tiene dentro su `CONTABILIZADO`:
+
+    Administración/ANDROMEDA SOLUTIONS/Facturas recibidas AS/2026/CONTABILIZADO
+    Administración/ANDROMEDA TECH GROUP/Facturas recibidas/2026/CONTABILIZADO
+
+El año de cada factura es el de su fecha de factura, o el del correo si todavía no se ha leído del PDF.
+La tarea programada «Sincronizar facturas con Drive» se ejecuta cada hora, recorre la carpeta de cada empresa y, para cada factura:
+
+- **Está en `<año>/CONTABILIZADO`**, o en una subcarpeta suya: queda como *contabilizada*.
+- **Está en otro sitio dentro de `<año>`**: queda como *subida a Drive*.
+- **Está fuera de `<año>`** (en otro año o en un `CONTABILIZADO` fuera de su año): no se vuelve a subir. Sale en la lista de *fuera de sitio* para que contabilidad la mueva.
+- **No está**: se sube a la raíz de `<año>`. Si `<año>` o su `CONTABILIZADO` no existen, los crea.
+
+Para encontrar cada factura se usa el id de Drive guardado o, si no lo tiene, el MD5 del PDF. Así se reconoce aunque contabilidad la renombre o alguien la haya subido antes a mano.
+No se suben los recibos de pago, los anexos, las facturas duplicadas ni las facturas sin empresa identificada; estas últimas se asignan a mano en el admin.
+
+Usa la misma cuenta de servicio que Gmail, con dos requisitos más:
+
+1. Activar la **Google Drive API** en el proyecto de Google Cloud.
+2. Añadir el scope `https://www.googleapis.com/auth/drive` a la delegación de todo el dominio, junto al de Gmail y en la misma línea, separados por coma.
+
+Además, el usuario `DRIVE_USUARIO` (por defecto `admin@andronautic.com`) tiene que ser miembro de la unidad compartida con permiso de gestor de contenido.
+
+```bash
+uv run python manage.py sincronizar_drive --probar   # qué subiría, sin tocar nada
+uv run python manage.py sincronizar_drive            # sube y actualiza
+```
+
+La tarea programada no hace nada hasta que se pone `DRIVE_FACTURAS_ACTIVO=true`. El comando funciona siempre.
+
 ## Despliegue en Render
 
 `render.yaml` define un Blueprint con web service, worker y Postgres gestionado en Frankfurt:

@@ -14,7 +14,7 @@ Factura": "16,66 21% 3,50 0% 0,00 20,16Eur". Si hay retención, `impuestos` es I
 para que base + impuestos = total (el importe a pagar).
 
 Junto a la factura, el proveedor envía el "DETALLE CONSUMO ENERGÍA TÉRMICA" de cada mes (lecturas
-de contadores e "IMPORTE TOTAL"): es un anexo informativo, no una factura, y se rechaza.
+de contadores e "IMPORTE TOTAL"): es un anexo informativo, no una factura (NoEsFactura).
 """
 
 import re
@@ -27,6 +27,7 @@ from ..base import (
     ExtraccionError,
     Extractor,
     Linea,
+    NoEsFactura,
     buscar,
     fecha,
     importe,
@@ -58,7 +59,7 @@ class FundacioBit(Extractor):
     def extraer(self, doc: Documento) -> DatosFactura:
         texto = doc.texto
         if re.search(r"DETALLE CONSUMO ENERG[ÍI]A T[ÉE]RMICA", texto, re.I):
-            raise ExtraccionError(
+            raise NoEsFactura(
                 "No es una factura: es el detalle de consumo de energía térmica (anexo "
                 "informativo de la factura TC)"
             )

@@ -185,6 +185,21 @@ GMAIL = {
     "SYNC_DAYS": env.int("GMAIL_SYNC_DAYS", default=30),
 }
 
+# Google Drive: copia de las facturas recibidas para contabilidad, en la carpeta de cada
+# empresa (Empresa.carpeta_drive). Usa la misma cuenta de servicio que Gmail, que necesita
+# además el scope https://www.googleapis.com/auth/drive.
+DRIVE = {
+    # Usuario de Workspace en cuyo nombre se actúa: debe tener acceso a la unidad compartida
+    "USUARIO": env("DRIVE_USUARIO", default=GMAIL["MAILBOX"]),
+    "SERVICE_ACCOUNT_JSON": env(
+        "DRIVE_SERVICE_ACCOUNT_JSON", default=GMAIL["SERVICE_ACCOUNT_JSON"]
+    ),
+    # Dentro de la carpeta del año: contabilidad mueve aquí las facturas ya contabilizadas
+    "CARPETA_CONTABILIZADO": env("DRIVE_CARPETA_CONTABILIZADO", default="CONTABILIZADO"),
+    # La tarea programada solo sube facturas con esto activado (el comando funciona siempre)
+    "ACTIVO": env.bool("DRIVE_FACTURAS_ACTIVO", default=False),
+}
+
 # --- Departamentos --------------------------------------------------------------------------
 # Cada departamento es un Group de Django. La navegación y los permisos de las vistas salen de aquí.
 DEPARTMENTS = {
@@ -206,4 +221,6 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
+    # httpx registra cada petición en INFO: demasiado ruido al recorrer las carpetas de Drive
+    "loggers": {"httpx": {"level": "WARNING"}},
 }

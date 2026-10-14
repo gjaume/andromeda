@@ -14,6 +14,7 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import (
     CreateView,
@@ -28,16 +29,18 @@ from django_q.models import Task
 from django_q.tasks import async_task
 
 from core.departments import DepartmentRequiredMixin
-from integrations import gmail
+from integrations import drive, gmail
 
+from .drive import facturas_a_subir
 from .extraccion.servicio import extraer_datos
 from .facturas import subir_facturas
 from .forms import ProveedorForm, SubirFacturasForm
-from .models import CorreoFactura, FacturaRecibida, Proveedor
+from .models import CorreoFactura, Empresa, FacturaRecibida, Proveedor
 
 logger = logging.getLogger(__name__)
 
 TAREA_SINCRONIZAR = "apps.administracion.tasks.sincronizar_facturas_gmail"
+TAREA_DRIVE = "apps.administracion.tasks.sincronizar_facturas_drive"
 
 
 class IndexView(DepartmentRequiredMixin, TemplateView):
@@ -74,6 +77,19 @@ class FacturasMixin(DepartmentRequiredMixin):
         self.proveedor = self.proveedor_filtrado()
         return queryset.filter(proveedor=self.proveedor) if self.proveedor else queryset
 
+    def filtrar_empresa(self, facturas):
+        """?empresa=<id>, o "ninguna" para las que no se sabe a quién van emitidas."""
+        valor = self.request.GET.get("empresa", "")
+        self.empresa = valor if valor == "ninguna" else None
+        if valor == "ninguna":
+            return facturas.filter(empresa__isnull=True)
+        if valor.isdigit():
+            self.empresa = Empresa.objects.filter(pk=valor).first()
+        return facturas.filter(empresa=self.empresa) if self.empresa else facturas
+
+    def contexto_empresa(self) -> dict:
+        return {"empresas": Empresa.objects.all(), "empresa_actual": self.empresa}
+
     def get_context_data(self, **kwargs):
         facturas = self.filtrar(FacturaRecibida.objects.all())
         sin_factura = self.filtrar(CorreoFactura.objects.pendientes())
@@ -86,8 +102,24 @@ class FacturasMixin(DepartmentRequiredMixin):
             .order_by("-stopped")
             .first(),
             gmail_configurado=gmail.is_configured(),
+            drive_configurado=drive.is_configured(),
+            pendientes_drive=facturas_a_subir()
+            .filter(subida_a_drive_en__isnull=True, empresa__isnull=False)
+            .exclude(empresa__carpeta_drive="")
+            .count(),
+            ultima_subida_drive=Task.objects.filter(func=TAREA_DRIVE).order_by("-stopped").first(),
             **kwargs,
         )
+
+
+FILTROS_CONTABILIDAD = {
+    "sin_subir": ("Sin subir a Drive", Q(subida_a_drive_en__isnull=True)),
+    "pendiente": (
+        "En Drive, sin contabilizar",
+        Q(subida_a_drive_en__isnull=False, contabilizada_en__isnull=True),
+    ),
+    "contabilizada": ("Contabilizadas", Q(contabilizada_en__isnull=False)),
+}
 
 
 class FacturaListView(FacturasMixin, ListView):
@@ -96,7 +128,7 @@ class FacturaListView(FacturasMixin, ListView):
 
     def get_queryset(self):
         facturas = FacturaRecibida.objects.select_related(
-            "proveedor", "correo", "subida_por", "duplicada_de"
+            "proveedor", "correo", "subida_por", "duplicada_de", "empresa"
         )
         # ?mes=AAAA-MM[&fecha=correo], al pulsar una casilla de la vista por meses
         self.mes = None
@@ -108,11 +140,23 @@ class FacturaListView(FacturasMixin, ListView):
                 facturas = facturas.con_fecha(self.criterio_fecha).filter(
                     fecha__year=anio, fecha__month=mes
                 )
-        return self.filtrar(facturas)
+        # ?contabilidad=sin_subir|pendiente|contabilizada (las duplicadas no se suben a Drive)
+        self.contabilidad = self.request.GET.get("contabilidad", "")
+        if self.contabilidad in FILTROS_CONTABILIDAD:
+            filtro = FILTROS_CONTABILIDAD[self.contabilidad][1]
+            facturas = facturas.sin_duplicados().filter(filtro)
+        else:
+            self.contabilidad = ""
+        return self.filtrar(self.filtrar_empresa(facturas))
 
     def get_context_data(self, **kwargs):
         return super().get_context_data(
-            mes_actual=self.mes, criterio_fecha=self.criterio_fecha, **kwargs
+            mes_actual=self.mes,
+            criterio_fecha=self.criterio_fecha,
+            contabilidad=self.contabilidad,
+            filtros_contabilidad={k: v[0] for k, v in FILTROS_CONTABILIDAD.items()},
+            **self.contexto_empresa(),
+            **kwargs,
         )
 
 
@@ -151,7 +195,7 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
     """Proveedores × meses de un año: qué facturas tenemos, cuáles faltan y cuánto suman.
 
     Cuentan las facturas y los abonos (estos en negativo). No cuentan los recibos de pago, que
-    justifican una factura ya contada, ni las duplicadas.
+    justifican una factura ya contada, ni los anexos, ni las duplicadas.
     """
 
     template_name = "administracion/facturas_por_mes.html"
@@ -160,7 +204,7 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
     def get_context_data(self, **kwargs):
         hoy = timezone.localdate()
         criterio = criterio_fecha(self.request)
-        facturas = FacturaRecibida.objects.con_fecha(criterio)
+        facturas = self.filtrar_empresa(FacturaRecibida.objects.con_fecha(criterio))
         anios = {d.year for d in facturas.dates("fecha", "year")}
         anios.add(hoy.year)
         anio_param = self.request.GET.get("anio", "")
@@ -173,7 +217,7 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
         for fila in (
             facturas.sin_duplicados()
             .filter(fecha__year=anio)
-            .exclude(tipo=FacturaRecibida.Tipo.RECIBO)
+            .exclude(tipo__in=FacturaRecibida.TIPOS_NO_GASTO)
             .annotate(mes=ExtractMonth("fecha"))
             .values_list("proveedor_id", "mes", "moneda", campo)
         ):
@@ -211,6 +255,7 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
             importes=self.IMPORTES,
             criterio_fecha=criterio,
             criterios_fecha=CRITERIOS_FECHA,
+            **self.contexto_empresa(),
             meses=MESES,
             mes_en_curso=hoy.month if anio == hoy.year else None,
             filas=filas,
@@ -291,12 +336,33 @@ class SincronizarFacturasView(DepartmentRequiredMixin, View):
         return redirect("administracion:facturas")
 
 
+class SubirADriveView(DepartmentRequiredMixin, View):
+    """Sube ya a Drive las facturas pendientes, sin esperar a la tarea de cada hora."""
+
+    department = "administracion"
+
+    def post(self, request):
+        if not drive.is_configured():
+            messages.error(request, "Drive no está configurado: falta la cuenta de servicio.")
+        else:
+            async_task(TAREA_DRIVE, forzar=True, task_name="Subir facturas a Drive (manual)")
+            messages.success(
+                request,
+                "Subiendo a Drive las facturas pendientes. Recarga la página en un minuto para "
+                "ver las marcas actualizadas.",
+            )
+        volver = request.POST.get("volver", "")
+        if url_has_allowed_host_and_scheme(volver, {request.get_host()}, request.is_secure()):
+            return redirect(volver)
+        return redirect("administracion:facturas")
+
+
 class FacturaDetalleView(DepartmentRequiredMixin, DetailView):
     department = "administracion"
     template_name = "administracion/factura_detalle.html"
     context_object_name = "factura"
     queryset = FacturaRecibida.objects.select_related(
-        "proveedor", "correo", "subida_por", "duplicada_de__correo"
+        "proveedor", "correo", "subida_por", "duplicada_de__correo", "empresa"
     )
 
     def get_context_data(self, **kwargs):

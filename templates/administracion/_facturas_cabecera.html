@@ -7,12 +7,22 @@
       {% if ultima_sincronizacion %}
         Última búsqueda: {{ ultima_sincronizacion.stopped|date:"j M Y, H:i" }}{% if not ultima_sincronizacion.success %} <strong class="text-danger">(falló)</strong>{% endif %}.
       {% endif %}
+      {% if ultima_subida_drive %}
+        Última subida a Drive: {{ ultima_subida_drive.stopped|date:"j M Y, H:i" }}{% if not ultima_subida_drive.success %} <strong class="text-danger">(falló)</strong>{% endif %}.
+      {% endif %}
     </p>
   </div>
-  <form method="post" action="{% url 'administracion:facturas_sincronizar' %}">
-    {% csrf_token %}
-    <button type="submit" class="button" {% if not gmail_configurado %}disabled title="Gmail no está configurado"{% endif %}>Buscar facturas ahora</button>
-  </form>
+  <div class="actions">
+    <form method="post" action="{% url 'administracion:facturas_subir_drive' %}">
+      {% csrf_token %}
+      <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+      <button type="submit" class="button-secondary" {% if not drive_configurado %}disabled title="Drive no está configurado"{% elif not pendientes_drive %}title="No hay facturas pendientes; también se actualizan las contabilizadas"{% endif %}>Subir a Drive{% if pendientes_drive %} ({{ pendientes_drive }} pendiente{{ pendientes_drive|pluralize }}){% endif %}</button>
+    </form>
+    <form method="post" action="{% url 'administracion:facturas_sincronizar' %}">
+      {% csrf_token %}
+      <button type="submit" class="button" {% if not gmail_configurado %}disabled title="Gmail no está configurado"{% endif %}>Buscar facturas ahora</button>
+    </form>
+  </div>
 </header>
 
 {% if not gmail_configurado %}
@@ -30,7 +40,7 @@
 
 {% if not ocultar_filtro_proveedor %}
 <form method="get" class="filters">
-  {% if mes_actual %}<input type="hidden" name="mes" value="{{ mes_actual|date:'Y-m' }}">{% endif %}
+  {% if mes_actual %}<input type="hidden" name="mes" value="{{ mes_actual|date:'Y-m' }}">{% if criterio_fecha and criterio_fecha != "factura" %}<input type="hidden" name="fecha" value="{{ criterio_fecha }}">{% endif %}{% endif %}
   <label for="f-proveedor">Proveedor</label>
   <select id="f-proveedor" name="proveedor" onchange="this.form.submit()">
     <option value="">Todos</option>
@@ -38,6 +48,21 @@
       <option value="{{ p.pk }}" {% if p == proveedor_actual %}selected{% endif %}>{{ p.nombre }}</option>
     {% endfor %}
   </select>
+  {% if empresas %}
+  <label for="f-empresa">Empresa</label>
+  <select id="f-empresa" name="empresa" onchange="this.form.submit()">
+    <option value="">Todas</option>
+    {% for e in empresas %}<option value="{{ e.pk }}" {% if e == empresa_actual %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+    <option value="ninguna" {% if empresa_actual == "ninguna" %}selected{% endif %}>Sin identificar</option>
+  </select>
+  {% endif %}
+  {% if filtros_contabilidad %}
+    <label for="f-contabilidad">Contabilidad</label>
+    <select id="f-contabilidad" name="contabilidad" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for valor, nombre in filtros_contabilidad.items %}<option value="{{ valor }}" {% if valor == contabilidad %}selected{% endif %}>{{ nombre }}</option>{% endfor %}
+    </select>
+  {% endif %}
   <noscript><button type="submit" class="button-secondary">Filtrar</button></noscript>
 </form>
 {% endif %}

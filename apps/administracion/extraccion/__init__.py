@@ -8,7 +8,16 @@ import importlib
 import pkgutil
 
 from . import extractores
-from .base import DatosFactura, Documento, ExtraccionError, Extractor, Linea, registrar, registro
+from .base import (
+    DatosFactura,
+    Documento,
+    ExtraccionError,
+    Extractor,
+    Linea,
+    NoEsFactura,
+    registrar,
+    registro,
+)
 
 for _modulo in pkgutil.iter_modules(extractores.__path__):
     importlib.import_module(f"{extractores.__name__}.{_modulo.name}")
@@ -19,6 +28,7 @@ __all__ = [
     "ExtraccionError",
     "Extractor",
     "Linea",
+    "NoEsFactura",
     "registrar",
     "registro",
 ]
