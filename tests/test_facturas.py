@@ -386,3 +386,72 @@ def test_recuperar_descartados_desde_el_admin(client, make_user, correo_sin_pdf)
     correo_sin_pdf.refresh_from_db()
     assert correo_sin_pdf.descartado_en is None
     assert CorreoFactura.objects.pendientes().filter(pk=correo_sin_pdf.pk).exists()
+
+
+# --- Vista por meses ------------------------------------------------------------------------
+
+
+def crear_factura(proveedor, cuando, gmail_id):
+    from django.core.files.base import ContentFile
+
+    correo = CorreoFactura.objects.create(
+        proveedor=proveedor, gmail_id=gmail_id, recibido_en=cuando
+    )
+    factura = FacturaRecibida(
+        proveedor=proveedor, correo=correo, gmail_part_id="1", recibida_en=cuando, tamano=1
+    )
+    factura.nombre_archivo = f"{gmail_id}.pdf"
+    factura.archivo.save(f"{gmail_id}.pdf", ContentFile(PDF), save=False)
+    factura.save()
+    return factura
+
+
+def madrid(*args):
+    from zoneinfo import ZoneInfo
+
+    from django.utils import timezone
+
+    return timezone.datetime(*args, tzinfo=ZoneInfo("Europe/Madrid"))
+
+
+def test_por_meses_marca_las_facturas_de_cada_mes(administracion, proveedor):
+    otro = Proveedor.objects.create(nombre="Repsol", etiqueta_gmail="Repsol")
+    Proveedor.objects.create(nombre="Antiguo", etiqueta_gmail="Antiguo", activo=False)
+    crear_factura(proveedor, madrid(2025, 3, 10), "a")
+    crear_factura(proveedor, madrid(2025, 3, 20), "b")
+    # 1 de mayo a las 00:30 en Madrid es 30 de abril en UTC: cuenta como mayo
+    crear_factura(proveedor, madrid(2025, 5, 1, 0, 30), "c")
+    crear_factura(proveedor, madrid(2024, 7, 1), "d")
+
+    response = administracion.get(reverse("administracion:facturas_por_mes"), {"anio": 2025})
+
+    filas = {f["proveedor"].nombre: f["meses"] for f in response.context["filas"]}
+    assert list(filas) == ["Iberdrola", "Repsol"]  # el inactivo sin facturas no aparece
+    assert len(filas["Iberdrola"]) == 12
+    assert [m["facturas"] for m in filas["Iberdrola"]] == [0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+    assert all(m["facturas"] == 0 for m in filas["Repsol"])
+    assert response.context["anios"][-2:] == [2025, 2024]
+    html = response.content.decode()
+    assert f"?proveedor={proveedor.pk}&amp;mes=2025-03" in html
+    assert "Iberdrola, Mar: 2 facturas" in html
+    assert otro.nombre in html
+
+
+def test_por_meses_usa_el_año_actual_por_defecto(administracion, proveedor):
+    from django.utils import timezone
+
+    response = administracion.get(reverse("administracion:facturas_por_mes"), {"anio": "xx"})
+    assert response.context["anio"] == timezone.localdate().year
+
+
+def test_filtro_por_mes_en_el_listado(administracion, proveedor):
+    crear_factura(proveedor, madrid(2025, 3, 10), "marzo")
+    crear_factura(proveedor, madrid(2025, 4, 10), "abril")
+    url = reverse("administracion:facturas")
+
+    html = administracion.get(url, {"proveedor": proveedor.pk, "mes": "2025-03"}).content.decode()
+
+    assert "marzo.pdf" in html
+    assert "abril.pdf" not in html
+    assert "Marzo 2025" in html
+    assert administracion.get(url, {"mes": "2025-13"}).status_code == 200

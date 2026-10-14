@@ -163,6 +163,32 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .tabs a[aria-current="page"] { color: var(--harbour); border-bottom-color: var(--signal); }
 .tabs .count { display: inline-block; min-width: 1.6em; padding: 0 0.4em; margin-left: 0.3rem; font-size: 0.8rem; text-align: center; border-radius: 999px; background: var(--line); color: var(--ink); }
 
+/* Vista proveedores × meses */
+.matrix { font-size: 0.9rem; }
+.matrix th, .matrix td { padding: 0.45rem 0.4rem; text-align: center; vertical-align: middle; }
+.matrix th[scope="row"], .matrix thead th:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--paper);
+  min-width: 11rem;
+  border-right: 1px solid var(--line);
+}
+.matrix thead th:first-child { background: var(--mist); z-index: 1; }
+.matrix th[scope="row"] a { color: var(--ink); text-decoration: none; font-weight: 700; }
+.matrix th[scope="row"] a:hover { text-decoration: underline; }
+.matrix td { min-width: 2.75rem; }
+.matrix tbody tr:hover td, .matrix tbody tr:hover th { background: #F6F9F8; }
+.matrix .is-future { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--mist) 6px 8px); }
+.matrix thead .is-current { color: var(--harbour); box-shadow: inset 0 -3px 0 var(--signal); }
+.tick { color: var(--ok); display: inline-flex; align-items: center; gap: 0.15rem; text-decoration: none; border-radius: 50%; }
+.tick:hover svg { transform: scale(1.15); }
+.tick svg { display: block; transition: transform 0.1s ease; }
+.tick-count { font-size: 0.75rem; font-weight: 700; color: var(--ok); }
+.active-filter { display: inline-flex; gap: 0.5rem; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 0.2rem 0.4rem 0.2rem 0.8rem; margin: 0 0 1rem; }
+.active-filter a { text-decoration: none; color: var(--rope); padding: 0 0.35rem; }
+.active-filter a:hover { color: var(--danger); }
+
 .filters { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .filters label { font-weight: 700; }
 .filters select, .form input, .form select, .form textarea {
@@ -193,4 +219,4 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
   .sidebar.is-open { transform: none; }
   .nav-toggle { display: inline-block; margin-bottom: 1rem; padding: 0.4rem 0.8rem; font: inherit; background: var(--harbour); color: #fff; border: 0; border-radius: 4px; }
 }
-@media (prefers-reduced-motion: reduce) { .sidebar { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .sidebar, .tick svg { transition: none; } }

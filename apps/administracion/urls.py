@@ -7,6 +7,7 @@ app_name = "administracion"
 urlpatterns = [
     path("", views.IndexView.as_view(), name="index"),
     path("facturas/", views.FacturaListView.as_view(), name="facturas"),
+    path("facturas/por-mes/", views.FacturasPorMesView.as_view(), name="facturas_por_mes"),
     path(
         "facturas/sin-factura/",
         views.CorreoSinFacturaListView.as_view(),

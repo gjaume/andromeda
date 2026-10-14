@@ -1,7 +1,7 @@
 {% if is_paginated %}
   <nav class="pagination" aria-label="Páginas">
-    {% if page_obj.has_previous %}<a href="?{% if proveedor_actual %}proveedor={{ proveedor_actual.pk }}&{% endif %}page={{ page_obj.previous_page_number }}">← Anteriores</a>{% endif %}
+    {% if page_obj.has_previous %}<a href="{% querystring page=page_obj.previous_page_number %}">← Anteriores</a>{% endif %}
     <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}<a href="?{% if proveedor_actual %}proveedor={{ proveedor_actual.pk }}&{% endif %}page={{ page_obj.next_page_number }}">Siguientes →</a>{% endif %}
+    {% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">Siguientes →</a>{% endif %}
   </nav>
 {% endif %}

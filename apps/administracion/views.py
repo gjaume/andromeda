@@ -1,11 +1,14 @@
 import logging
 import mimetypes
+import re
+from datetime import date
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.cache import cache
-from django.db.models import Count
+from django.db.models import Count, Q
+from django.db.models.functions import ExtractMonth
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
@@ -72,7 +75,69 @@ class FacturaListView(FacturasMixin, ListView):
 
     def get_queryset(self):
         facturas = FacturaRecibida.objects.select_related("proveedor", "correo", "subida_por")
+        # ?mes=AAAA-MM, al pulsar una casilla de la vista por meses
+        self.mes = None
+        if match := re.fullmatch(r"(\d{4})-(\d{2})", self.request.GET.get("mes", "")):
+            anio, mes = int(match[1]), int(match[2])
+            if 1 <= mes <= 12:
+                self.mes = date(anio, mes, 1)
+                facturas = facturas.filter(recibida_en__year=anio, recibida_en__month=mes)
         return self.filtrar(facturas)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(mes_actual=self.mes, **kwargs)
+
+
+MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+
+class FacturasPorMesView(FacturasMixin, TemplateView):
+    """Proveedores × meses de un año: de un vistazo, qué facturas tenemos y cuáles faltan."""
+
+    template_name = "administracion/facturas_por_mes.html"
+
+    def get_context_data(self, **kwargs):
+        hoy = timezone.localdate()
+        anios = {d.year for d in FacturaRecibida.objects.datetimes("recibida_en", "year")}
+        anios.add(hoy.year)
+        anio_param = self.request.GET.get("anio", "")
+        anio = int(anio_param) if anio_param.isdigit() and int(anio_param) in anios else hoy.year
+
+        conteo = {
+            (fila["proveedor_id"], fila["mes"]): fila["n"]
+            for fila in FacturaRecibida.objects.filter(recibida_en__year=anio)
+            .annotate(mes=ExtractMonth("recibida_en"))
+            .values("proveedor_id", "mes")
+            .annotate(n=Count("id"))
+        }
+        # Proveedores activos, más los inactivos que tuvieron facturas ese año
+        proveedores = Proveedor.objects.filter(
+            Q(activo=True) | Q(facturas__recibida_en__year=anio)
+        ).distinct()
+        filas = [
+            {
+                "proveedor": proveedor,
+                "meses": [
+                    {
+                        "numero": numero,
+                        "nombre": MESES[numero - 1],
+                        "facturas": conteo.get((proveedor.pk, numero), 0),
+                        "futuro": (anio, numero) > (hoy.year, hoy.month),
+                    }
+                    for numero in range(1, 13)
+                ],
+            }
+            for proveedor in proveedores
+        ]
+        return super().get_context_data(
+            anio=anio,
+            anios=sorted(anios, reverse=True),
+            meses=MESES,
+            mes_en_curso=hoy.month if anio == hoy.year else None,
+            filas=filas,
+            ocultar_filtro_proveedor=True,
+            **kwargs,
+        )
 
 
 class CorreoSinFacturaListView(FacturasMixin, ListView):

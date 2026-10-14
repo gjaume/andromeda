@@ -3,6 +3,10 @@
 {% block content %}
 {% include "administracion/_facturas_cabecera.html" %}
 
+{% if mes_actual %}
+  <p class="active-filter">Mes: <strong>{{ mes_actual|date:"F Y"|capfirst }}</strong> <a href="{% querystring mes=None page=None %}" aria-label="Quitar el filtro de mes">✕</a></p>
+{% endif %}
+
 {% if facturas %}
   <div class="table-wrap">
     <table class="table">

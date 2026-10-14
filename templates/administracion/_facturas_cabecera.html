@@ -21,12 +21,16 @@
 
 {% url 'administracion:facturas' as url_facturas %}
 {% url 'administracion:correos_sin_factura' as url_sin_factura %}
+{% url 'administracion:facturas_por_mes' as url_por_mes %}
 <nav class="tabs" aria-label="Vistas">
   <a href="{{ url_facturas }}{% if proveedor_actual %}?proveedor={{ proveedor_actual.pk }}{% endif %}" {% if request.path == url_facturas %}aria-current="page"{% endif %}>Facturas <span class="count">{{ total_facturas }}</span></a>
+  <a href="{{ url_por_mes }}" {% if request.path == url_por_mes %}aria-current="page"{% endif %}>Por meses</a>
   <a href="{{ url_sin_factura }}{% if proveedor_actual %}?proveedor={{ proveedor_actual.pk }}{% endif %}" {% if request.path == url_sin_factura %}aria-current="page"{% endif %}>Correos sin factura <span class="count">{{ total_sin_factura }}</span></a>
 </nav>
 
+{% if not ocultar_filtro_proveedor %}
 <form method="get" class="filters">
+  {% if mes_actual %}<input type="hidden" name="mes" value="{{ mes_actual|date:'Y-m' }}">{% endif %}
   <label for="f-proveedor">Proveedor</label>
   <select id="f-proveedor" name="proveedor" onchange="this.form.submit()">
     <option value="">Todos</option>
@@ -36,3 +40,4 @@
   </select>
   <noscript><button type="submit" class="button-secondary">Filtrar</button></noscript>
 </form>
+{% endif %}
