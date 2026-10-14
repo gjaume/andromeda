@@ -66,6 +66,7 @@ def extraer_datos(factura: FacturaRecibida) -> FacturaRecibida:
             estado = Estado.REVISAR if avisos else Estado.OK
             detalle = "\n".join(avisos)
 
+    clave_anterior = clave_duplicado(factura)
     with transaction.atomic():
         factura.lineas.all().delete()
         factura.extraccion_estado = estado
@@ -96,5 +97,57 @@ def extraer_datos(factura: FacturaRecibida) -> FacturaRecibida:
                 setattr(factura, campo, "")
             for campo in ("fecha_factura", "base_imponible", "impuestos", "total"):
                 setattr(factura, campo, None)
+        if not factura.numero_factura:
+            factura.duplicada_de = None  # sin nº no se puede saber si es copia de otra
         factura.save()
+        for clave in {clave_anterior, clave_duplicado(factura)} - {None}:
+            marcar_duplicados(*clave)
+        factura.refresh_from_db(fields=["duplicada_de"])
     return factura
+
+
+# --- Duplicados -----------------------------------------------------------------------------
+
+
+def clave_duplicado(factura: FacturaRecibida) -> tuple[int, str, str] | None:
+    """Lo que identifica una factura: proveedor, tipo y nº. Sin nº no se puede saber."""
+    if not factura.numero_factura:
+        return None
+    return factura.proveedor_id, factura.tipo, factura.numero_factura
+
+
+def marcar_duplicados(proveedor_id: int, tipo: str, numero: str) -> int:
+    """La primera recibida con esa clave es la original; las demás, sus duplicados.
+
+    Se recalcula el grupo entero para que quede bien aunque cambie el nº de una de ellas.
+    Devuelve cuántas facturas han cambiado.
+    """
+    grupo = list(
+        FacturaRecibida.objects.filter(
+            proveedor_id=proveedor_id, tipo=tipo, numero_factura=numero
+        ).order_by("recibida_en", "id")
+    )
+    original = grupo[0] if grupo else None
+    cambiadas = 0
+    for factura in grupo:
+        duplicada_de = None if factura is original else original.pk
+        if factura.duplicada_de_id != duplicada_de:
+            factura.duplicada_de_id = duplicada_de
+            factura.save(update_fields=["duplicada_de"])
+            cambiadas += 1
+    return cambiadas
+
+
+def marcar_todos_los_duplicados() -> int:
+    """Recalcula los duplicados de todas las facturas. Devuelve cuántas han cambiado."""
+    cambiadas = FacturaRecibida.objects.filter(
+        numero_factura="", duplicada_de__isnull=False
+    ).update(duplicada_de=None)
+    claves = (
+        FacturaRecibida.objects.exclude(numero_factura="")
+        .values_list("proveedor_id", "tipo", "numero_factura")
+        .distinct()
+    )
+    for clave in claves:
+        cambiadas += marcar_duplicados(*clave)
+    return cambiadas

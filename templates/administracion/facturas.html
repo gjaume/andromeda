@@ -16,12 +16,13 @@
       </thead>
       <tbody>
         {% for f in facturas %}
-          <tr>
+          <tr{% if f.duplicada_de %} class="is-duplicate"{% endif %}>
             <td class="nowrap">{{ f.recibida_en|date:"d/m/Y H:i" }}</td>
             <td>{{ f.proveedor.nombre }}</td>
             <td>
               <a href="{% url 'administracion:factura_archivo' f.pk %}" target="_blank" rel="noopener">{{ f.nombre_archivo }}</a>
               {% if f.subida_a_mano %}<span class="tag" title="Subida por {{ f.subida_por.email|default:'—' }}">subida a mano</span>{% endif %}
+              {% if f.duplicada_de %}<a class="tag tag-muted" href="{% url 'administracion:factura_detalle' f.duplicada_de.pk %}" title="Misma factura que la recibida el {{ f.duplicada_de.recibida_en|date:'d/m/Y' }}; no se cuenta dos veces">duplicada</a>{% endif %}
               {% if f.tipo and f.tipo != "factura" %}<span class="tag tag-muted">{{ f.get_tipo_display }}</span>{% endif %}
               {% if f.numero_factura or f.fecha_factura %}<br><span class="muted small">Nº {{ f.numero_factura|default:"—" }}{% if f.fecha_factura %} · {{ f.fecha_factura|date:"d/m/Y" }}{% endif %}</span>{% endif %}
             </td>

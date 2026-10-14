@@ -49,6 +49,19 @@ class DescartadoFilter(admin.SimpleListFilter):
         return queryset
 
 
+class DuplicadaFilter(admin.SimpleListFilter):
+    title = "duplicada"
+    parameter_name = "duplicada"
+
+    def lookups(self, request, model_admin):
+        return [("si", "Duplicadas"), ("no", "Originales")]
+
+    def queryset(self, request, queryset):
+        if self.value() in ("si", "no"):
+            return queryset.filter(duplicada_de__isnull=self.value() == "no")
+        return queryset
+
+
 class FacturaInline(TabularInline):
     model = FacturaRecibida
     fields = (abrir_archivo, "tamano")
@@ -99,8 +112,9 @@ class FacturaRecibidaAdmin(ModelAdmin):
         "total",
         "moneda",
         "extraccion_estado",
+        "duplicada_de",
     )
-    list_filter = ("extraccion_estado", "moneda", "tipo", "proveedor")
+    list_filter = ("extraccion_estado", DuplicadaFilter, "moneda", "tipo", "proveedor")
     search_fields = ("nombre_archivo", "numero_factura", "correo__asunto")
     readonly_fields = [abrir_archivo, *(f.name for f in FacturaRecibida._meta.fields)]
     inlines = [LineaInline]

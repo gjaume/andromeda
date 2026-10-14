@@ -2,7 +2,12 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
 from apps.administracion.extraccion import Documento, ExtraccionError
-from apps.administracion.extraccion.servicio import comprobar, extraer_datos, leer
+from apps.administracion.extraccion.servicio import (
+    comprobar,
+    extraer_datos,
+    leer,
+    marcar_todos_los_duplicados,
+)
 from apps.administracion.models import FacturaRecibida
 
 
@@ -23,12 +28,22 @@ class Command(BaseCommand):
             help="Mostrar lo que se extrae sin guardar nada (para desarrollar extractores).",
         )
         parser.add_argument(
+            "--duplicados",
+            action="store_true",
+            help="Solo recalcular qué facturas son duplicadas (mismo proveedor, tipo y nº).",
+        )
+        parser.add_argument(
             "--texto",
             choices=["plano", "layout"],
             help="Mostrar el texto del PDF tal como lo ve el extractor, sin extraer.",
         )
 
-    def handle(self, *args, proveedor, factura, todas, probar, texto, **options):
+    def handle(self, *args, proveedor, factura, todas, probar, texto, duplicados, **options):
+        if duplicados:
+            cambiadas = marcar_todos_los_duplicados()
+            n = FacturaRecibida.objects.filter(duplicada_de__isnull=False).count()
+            self.stdout.write(self.style.SUCCESS(f"{n} duplicadas ({cambiadas} cambios)"))
+            return
         facturas = FacturaRecibida.objects.select_related("proveedor").order_by("recibida_en")
         if proveedor:
             facturas = facturas.filter(

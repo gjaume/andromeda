@@ -9,6 +9,8 @@ class AdministracionConfig(AppConfig):
     def ready(self) -> None:
         from core.navigation import Tool, register_tool
 
+        from . import signals  # noqa: F401
+
         register_tool(
             "administracion",
             Tool(

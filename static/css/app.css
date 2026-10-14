@@ -172,6 +172,7 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .estado-revisar { background: #FCE8B2; }
 .estado-error { background: #F6D5D3; color: var(--danger); }
 .estado-ok { background: #D6EBDF; color: var(--ok); }
+.is-duplicate td { color: var(--rope); }
 .msg-warning { border-left-color: var(--signal); }
 .actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 .summary { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1.5rem; }

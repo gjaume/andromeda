@@ -95,6 +95,11 @@ def factura_upload_to(instance: "FacturaRecibida", filename: str) -> str:
     return f"facturas/{slugify(instance.proveedor.nombre)}/{fecha:%Y/%m}/{limpio}"
 
 
+class FacturaRecibidaQuerySet(models.QuerySet):
+    def sin_duplicados(self):
+        return self.filter(duplicada_de__isnull=True)
+
+
 class FacturaRecibida(models.Model):
     proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name="facturas")
     correo = models.ForeignKey(CorreoFactura, on_delete=models.CASCADE, related_name="facturas")
@@ -142,6 +147,18 @@ class FacturaRecibida(models.Model):
     )
     extraccion_detalle = models.TextField("detalle de la extracción", blank=True)
     extraida_en = models.DateTimeField(null=True, blank=True)
+    # Mismo proveedor, tipo y nº de factura que otra recibida antes (p. ej. el PDF reenviado en
+    # un recordatorio): no se cuenta para no sumar dos veces el mismo gasto.
+    duplicada_de = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="duplicados",
+        help_text="Factura original de la que esta es una copia.",
+    )
+
+    objects = FacturaRecibidaQuerySet.as_manager()
 
     class Meta:
         ordering = ["-recibida_en", "-id"]

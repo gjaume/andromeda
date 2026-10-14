@@ -32,6 +32,12 @@
   </dl>
 </section>
 
+{% if factura.duplicada_de %}
+  <p class="msg msg-warning">Esta factura es un <strong>duplicado</strong>: el mismo nº ya llegó el {{ factura.duplicada_de.recibida_en|date:"d/m/Y" }} (<a href="{% url 'administracion:factura_detalle' factura.duplicada_de.pk %}">ver la original</a>). Suele ser el PDF reenviado en una respuesta o un recordatorio, y no se cuenta en la vista por meses.</p>
+{% elif duplicados %}
+  <p class="msg">Esta factura volvió a llegar en {{ duplicados|length }} correo{{ duplicados|length|pluralize }} más ({% for d in duplicados %}<a href="{% url 'administracion:factura_detalle' d.pk %}">{{ d.recibida_en|date:"d/m/Y" }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}). Esas copias figuran como duplicadas y solo se cuenta esta.</p>
+{% endif %}
+
 {% if factura.extraccion_detalle %}
   <div class="msg {% if factura.extraccion_estado == 'error' %}msg-error{% else %}msg-warning{% endif %}">
     {{ factura.extraccion_detalle|linebreaksbr }}

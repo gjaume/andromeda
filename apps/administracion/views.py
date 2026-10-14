@@ -83,7 +83,9 @@ class FacturaListView(FacturasMixin, ListView):
     context_object_name = "facturas"
 
     def get_queryset(self):
-        facturas = FacturaRecibida.objects.select_related("proveedor", "correo", "subida_por")
+        facturas = FacturaRecibida.objects.select_related(
+            "proveedor", "correo", "subida_por", "duplicada_de"
+        )
         # ?mes=AAAA-MM, al pulsar una casilla de la vista por meses
         self.mes = None
         if match := re.fullmatch(r"(\d{4})-(\d{2})", self.request.GET.get("mes", "")):
@@ -114,7 +116,8 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
 
         conteo = {
             (fila["proveedor_id"], fila["mes"]): fila["n"]
-            for fila in FacturaRecibida.objects.filter(recibida_en__year=anio)
+            for fila in FacturaRecibida.objects.sin_duplicados()
+            .filter(recibida_en__year=anio)
             .annotate(mes=ExtractMonth("recibida_en"))
             .values("proveedor_id", "mes")
             .annotate(n=Count("id"))
@@ -223,12 +226,19 @@ class FacturaDetalleView(DepartmentRequiredMixin, DetailView):
     department = "administracion"
     template_name = "administracion/factura_detalle.html"
     context_object_name = "factura"
-    queryset = FacturaRecibida.objects.select_related("proveedor", "correo", "subida_por")
+    queryset = FacturaRecibida.objects.select_related(
+        "proveedor", "correo", "subida_por", "duplicada_de__correo"
+    )
 
     def get_context_data(self, **kwargs):
         lineas = list(self.object.lineas.all())
         suma = sum((linea.importe for linea in lineas), Decimal(0))
-        return super().get_context_data(lineas=lineas, suma_lineas=suma, **kwargs)
+        return super().get_context_data(
+            lineas=lineas,
+            suma_lineas=suma,
+            duplicados=self.object.duplicados.select_related("correo").order_by("recibida_en"),
+            **kwargs,
+        )
 
 
 class FacturaExtraerView(DepartmentRequiredMixin, View):
