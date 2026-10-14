@@ -271,3 +271,72 @@ def test_el_admin_filtra_correos_sin_factura(client, make_user, api, gmail, prov
     html = client.get(f"{url}?con_factura=no").content.decode()
     assert "Aviso sin PDF" in html
     assert "Factura octubre" not in html
+
+
+# --- Subida manual --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def correo_sin_pdf(proveedor):
+    from django.utils import timezone
+
+    return CorreoFactura.objects.create(
+        proveedor=proveedor,
+        gmail_id="m9",
+        asunto="Su factura está en el portal",
+        recibido_en=timezone.now(),
+    )
+
+
+def pdf(nombre="factura.pdf", contenido=PDF):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    return SimpleUploadedFile(nombre, contenido, content_type="application/pdf")
+
+
+def test_subir_pdf_a_un_correo_sin_factura(administracion, correo_sin_pdf, make_user):
+    url = reverse("administracion:subir_facturas", args=[correo_sin_pdf.pk])
+    sin_factura = reverse("administracion:correos_sin_factura")
+    assert url in administracion.get(sin_factura).content.decode()
+
+    response = administracion.post(url, {"archivos": [pdf("a.pdf"), pdf("b.pdf")]})
+
+    assert response.status_code == 302
+    facturas = FacturaRecibida.objects.filter(correo=correo_sin_pdf).order_by("nombre_archivo")
+    assert [f.nombre_archivo for f in facturas] == ["a.pdf", "b.pdf"]
+    factura = facturas[0]
+    assert factura.subida_a_mano
+    assert factura.subida_por.email == "ana@andronautic.com"
+    assert factura.recibida_en == correo_sin_pdf.recibido_en
+    assert factura.archivo.read() == PDF
+    # El correo sale de la pestaña y la factura aparece marcada en el listado
+    assert "Su factura está en el portal" not in administracion.get(sin_factura).content.decode()
+    html = administracion.get(reverse("administracion:facturas")).content.decode()
+    assert "subida a mano" in html
+
+
+@pytest.mark.parametrize(
+    ("archivo", "error"),
+    [
+        (pdf("foto.png"), "no es un PDF"),
+        (pdf("falso.pdf", b"hola, no soy un pdf"), "no parece un PDF"),
+    ],
+)
+def test_solo_se_aceptan_pdf(administracion, correo_sin_pdf, archivo, error):
+    url = reverse("administracion:subir_facturas", args=[correo_sin_pdf.pk])
+    response = administracion.post(url, {"archivos": [archivo]})
+    assert response.status_code == 200
+    assert error in response.content.decode()
+    assert not FacturaRecibida.objects.exists()
+
+
+def test_subir_sin_elegir_fichero(administracion, correo_sin_pdf):
+    url = reverse("administracion:subir_facturas", args=[correo_sin_pdf.pk])
+    response = administracion.post(url, {})
+    assert "Elige al menos un PDF" in response.content.decode()
+
+
+def test_solo_administracion_puede_subir(client, make_user, correo_sin_pdf):
+    client.force_login(make_user(email="eva@andronautic.com", departments=["Comercial"]))
+    url = reverse("administracion:subir_facturas", args=[correo_sin_pdf.pk])
+    assert client.post(url, {"archivos": [pdf()]}).status_code == 403

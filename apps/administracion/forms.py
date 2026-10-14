@@ -20,3 +20,39 @@ class ProveedorForm(forms.ModelForm):
         if etiqueta.casefold().startswith(padre.casefold()):
             etiqueta = etiqueta[len(padre) :]
         return etiqueta
+
+
+MAX_PDF_MB = 20
+
+
+class VariosArchivosInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class VariosPdfField(forms.FileField):
+    widget = VariosArchivosInput(attrs={"accept": "application/pdf,.pdf"})
+
+    def clean(self, data, initial=None):
+        archivos = data if isinstance(data, (list, tuple)) else [data]
+        if not any(archivos):
+            raise forms.ValidationError("Elige al menos un PDF.")
+        validos = []
+        for archivo in archivos:
+            validos.append(self.validar_pdf(super().clean(archivo, initial)))
+        return validos
+
+    @staticmethod
+    def validar_pdf(archivo):
+        if not archivo.name.lower().endswith(".pdf"):
+            raise forms.ValidationError(f"«{archivo.name}» no es un PDF.")
+        if archivo.size > MAX_PDF_MB * 1024 * 1024:
+            raise forms.ValidationError(f"«{archivo.name}» ocupa más de {MAX_PDF_MB} MB.")
+        cabecera = archivo.read(5)
+        archivo.seek(0)
+        if cabecera != b"%PDF-":
+            raise forms.ValidationError(f"«{archivo.name}» no parece un PDF válido.")
+        return archivo
+
+
+class SubirFacturasForm(forms.Form):
+    archivos = VariosPdfField(label="Facturas en PDF")

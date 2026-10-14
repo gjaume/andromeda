@@ -3,13 +3,13 @@
 {% block content %}
 {% include "administracion/_facturas_cabecera.html" %}
 
-<p class="lede">Correos de proveedores que no traían ningún PDF adjunto. Suelen ser avisos con la factura en el portal del proveedor, que hay que descargar a mano, o respuestas dentro de un hilo.</p>
+<p class="lede">Correos de proveedores que no traían ningún PDF adjunto. Suelen ser avisos con la factura en el portal del proveedor: descárgala y súbela con «Subir PDF» para que pase a Facturas.</p>
 
 {% if correos %}
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th scope="col">Recibido</th><th scope="col">Proveedor</th><th scope="col">Asunto</th><th scope="col">Remitente</th></tr>
+        <tr><th scope="col">Recibido</th><th scope="col">Proveedor</th><th scope="col">Asunto</th><th scope="col">Remitente</th><th scope="col">Acciones</th></tr>
       </thead>
       <tbody>
         {% for c in correos %}
@@ -18,6 +18,7 @@
             <td>{{ c.proveedor.nombre }}</td>
             <td><a href="{{ c.gmail_url }}" target="_blank" rel="noopener">{{ c.asunto|default:"(sin asunto)" }}</a></td>
             <td class="muted">{{ c.remitente }}</td>
+            <td class="nowrap"><a class="button-secondary button-small" href="{% url 'administracion:subir_facturas' c.pk %}">Subir PDF</a></td>
           </tr>
         {% endfor %}
       </tbody>

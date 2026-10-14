@@ -14,7 +14,7 @@
           <tr>
             <td class="nowrap">{{ f.recibida_en|date:"d/m/Y H:i" }}</td>
             <td>{{ f.proveedor.nombre }}</td>
-            <td><a href="{% url 'administracion:factura_archivo' f.pk %}" target="_blank" rel="noopener">{{ f.nombre_archivo }}</a> <span class="muted">{{ f.tamano|filesizeformat }}</span></td>
+            <td><a href="{% url 'administracion:factura_archivo' f.pk %}" target="_blank" rel="noopener">{{ f.nombre_archivo }}</a> <span class="muted">{{ f.tamano|filesizeformat }}</span>{% if f.subida_a_mano %} <span class="tag" title="Subida por {{ f.subida_por.email|default:'—' }}">subida a mano</span>{% endif %}</td>
             <td><a href="{{ f.correo.gmail_url }}" target="_blank" rel="noopener" class="muted">{{ f.correo.asunto|default:"(sin asunto)" }}</a></td>
           </tr>
         {% endfor %}

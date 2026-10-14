@@ -7,10 +7,10 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.core.cache import cache
 from django.db.models import Count
 from django.http import FileResponse
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import CreateView, ListView, TemplateView, UpdateView
+from django.views.generic import CreateView, FormView, ListView, TemplateView, UpdateView
 from django.views.generic.detail import SingleObjectMixin
 from django_q.models import Task
 from django_q.tasks import async_task
@@ -18,7 +18,8 @@ from django_q.tasks import async_task
 from core.departments import DepartmentRequiredMixin
 from integrations import gmail
 
-from .forms import ProveedorForm
+from .facturas import subir_facturas
+from .forms import ProveedorForm, SubirFacturasForm
 from .models import CorreoFactura, FacturaRecibida, Proveedor
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,8 @@ class FacturaListView(FacturasMixin, ListView):
     context_object_name = "facturas"
 
     def get_queryset(self):
-        return self.filtrar(FacturaRecibida.objects.select_related("proveedor", "correo"))
+        facturas = FacturaRecibida.objects.select_related("proveedor", "correo", "subida_por")
+        return self.filtrar(facturas)
 
 
 class CorreoSinFacturaListView(FacturasMixin, ListView):
@@ -81,6 +83,29 @@ class CorreoSinFacturaListView(FacturasMixin, ListView):
     def get_queryset(self):
         correos = CorreoFactura.objects.filter(facturas__isnull=True).select_related("proveedor")
         return self.filtrar(correos)
+
+
+class SubirFacturasView(DepartmentRequiredMixin, FormView):
+    """Para correos sin PDF: se sube la factura descargada a mano del portal del proveedor."""
+
+    department = "administracion"
+    form_class = SubirFacturasForm
+    template_name = "administracion/subir_facturas.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.correo = get_object_or_404(
+            CorreoFactura.objects.select_related("proveedor"), pk=kwargs["pk"]
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(correo=self.correo, **kwargs)
+
+    def form_valid(self, form):
+        facturas = subir_facturas(self.correo, form.cleaned_data["archivos"], self.request.user)
+        nombres = ", ".join(f.nombre_archivo for f in facturas)
+        messages.success(self.request, f"Factura añadida a {self.correo.proveedor}: {nombres}.")
+        return redirect("administracion:correos_sin_factura")
 
 
 class SincronizarFacturasView(DepartmentRequiredMixin, View):

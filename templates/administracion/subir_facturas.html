@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Subir factura · {{ correo.proveedor.nombre }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <p class="crumb"><a href="{% url 'administracion:correos_sin_factura' %}">← Correos sin factura</a></p>
+  <h1>Subir factura de {{ correo.proveedor.nombre }}</h1>
+  <p class="lede">Descarga la factura del portal del proveedor (o del enlace del correo) y súbela aquí. Quedará en Facturas recibidas con la fecha del correo.</p>
+</header>
+
+<dl class="mail-summary">
+  <dt>Recibido</dt><dd>{{ correo.recibido_en|date:"d/m/Y H:i" }}</dd>
+  <dt>Asunto</dt><dd><a href="{{ correo.gmail_url }}" target="_blank" rel="noopener">{{ correo.asunto|default:"(sin asunto)" }}</a></dd>
+  <dt>Remitente</dt><dd>{{ correo.remitente }}</dd>
+</dl>
+
+<form method="post" enctype="multipart/form-data" class="form" novalidate>
+  {% csrf_token %}
+  <div class="field{% if form.archivos.errors %} has-error{% endif %}">
+    {{ form.archivos.label_tag }} {{ form.archivos }}
+    <p class="help">Puedes elegir varios PDF a la vez. Máximo 20 MB por fichero.</p>
+    {% for error in form.archivos.errors %}<p class="error">{{ error }}</p>{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">Subir</button>
+    <a href="{% url 'administracion:correos_sin_factura' %}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

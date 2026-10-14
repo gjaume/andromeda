@@ -68,7 +68,15 @@ def factura_upload_to(instance: "FacturaRecibida", filename: str) -> str:
 class FacturaRecibida(models.Model):
     proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name="facturas")
     correo = models.ForeignKey(CorreoFactura, on_delete=models.CASCADE, related_name="facturas")
-    gmail_part_id = models.CharField(max_length=32)
+    # Vacío si la factura no venía adjunta y alguien la subió a mano
+    gmail_part_id = models.CharField(max_length=32, blank=True)
+    subida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="facturas_subidas",
+    )
     archivo = models.FileField(upload_to=factura_upload_to, max_length=300)
     nombre_archivo = models.CharField(max_length=255)
     tamano = models.PositiveIntegerField("tamaño (bytes)", default=0)
@@ -81,9 +89,15 @@ class FacturaRecibida(models.Model):
         verbose_name_plural = "facturas recibidas"
         constraints = [
             models.UniqueConstraint(
-                fields=["correo", "gmail_part_id"], name="factura_unica_por_adjunto"
+                fields=["correo", "gmail_part_id"],
+                condition=~models.Q(gmail_part_id=""),
+                name="factura_unica_por_adjunto",
             )
         ]
 
     def __str__(self) -> str:
         return f"{self.proveedor} · {self.nombre_archivo}"
+
+    @property
+    def subida_a_mano(self) -> bool:
+        return not self.gmail_part_id

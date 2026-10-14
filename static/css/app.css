@@ -131,6 +131,12 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .button:hover { background: var(--harbour-soft); }
 .button:disabled { background: var(--rope); cursor: not-allowed; }
 .button-secondary { color: var(--harbour); background: var(--paper); border: 1px solid var(--line); }
+.button-secondary:hover { border-color: var(--harbour-soft); }
+.button-small { padding: 0.3rem 0.7rem; font-size: 0.875rem; }
+.tag { display: inline-block; padding: 0 0.45em; font-size: 0.75rem; border-radius: 3px; background: var(--signal); color: var(--ink); vertical-align: 0.1em; }
+.mail-summary { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.25rem; margin: 0 0 1.5rem; max-width: 36rem; display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; }
+.mail-summary dt { font-weight: 700; color: var(--rope); }
+.mail-summary dd { margin: 0; overflow-wrap: anywhere; }
 
 .page-head-actions { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .page-head-actions .lede { margin-bottom: 1.5rem; }

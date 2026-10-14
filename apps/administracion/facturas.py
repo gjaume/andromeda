@@ -124,3 +124,22 @@ def _guardar_correo(gmail: GmailClient, proveedor: Proveedor, mensaje: GmailMess
             factura.archivo.save(adjunto.filename, ContentFile(contenido), save=False)
             factura.save()
     return len(contenidos)
+
+
+def subir_facturas(correo: CorreoFactura, archivos, usuario) -> list[FacturaRecibida]:
+    """Adjunta a un correo las facturas que el proveedor no mandó en PDF (descargadas a mano)."""
+    facturas = []
+    with transaction.atomic():
+        for archivo in archivos:
+            factura = FacturaRecibida(
+                proveedor=correo.proveedor,
+                correo=correo,
+                nombre_archivo=archivo.name[:255],
+                tamano=archivo.size,
+                recibida_en=correo.recibido_en,
+                subida_por=usuario,
+            )
+            factura.archivo.save(archivo.name, archivo, save=False)
+            factura.save()
+            facturas.append(factura)
+    return facturas
