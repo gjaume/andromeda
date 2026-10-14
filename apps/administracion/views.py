@@ -102,10 +102,43 @@ class FacturaListView(FacturasMixin, ListView):
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 
+class Importes:
+    """Suma de importes por moneda, más las facturas que no tienen importe (no se pudo leer)."""
+
+    def __init__(self) -> None:
+        self.por_moneda: dict[str, Decimal] = {}
+        self.facturas = 0
+        self.sin_importe = 0
+
+    def sumar(self, moneda: str, importe: Decimal | None, facturas: int = 1) -> None:
+        self.facturas += facturas
+        if importe is None:
+            self.sin_importe += facturas
+        else:
+            self.por_moneda[moneda] = self.por_moneda.get(moneda, Decimal(0)) + importe
+
+    def __iadd__(self, otro: "Importes") -> "Importes":
+        for moneda, importe in otro.por_moneda.items():
+            self.sumar(moneda, importe, facturas=0)
+        self.facturas += otro.facturas
+        self.sin_importe += otro.sin_importe
+        return self
+
+    @property
+    def lista(self) -> list[tuple[str, Decimal]]:
+        """[(moneda, importe)], el euro primero."""
+        return sorted(self.por_moneda.items(), key=lambda par: (par[0] != "EUR", par[0]))
+
+
 class FacturasPorMesView(FacturasMixin, TemplateView):
-    """Proveedores × meses de un año: de un vistazo, qué facturas tenemos y cuáles faltan."""
+    """Proveedores × meses de un año: qué facturas tenemos, cuáles faltan y cuánto suman.
+
+    Cuentan las facturas y los abonos (estos en negativo). No cuentan los recibos de pago, que
+    justifican una factura ya contada, ni las duplicadas.
+    """
 
     template_name = "administracion/facturas_por_mes.html"
+    IMPORTES = {"total": "Total (con impuestos)", "base": "Base imponible"}
 
     def get_context_data(self, **kwargs):
         hoy = timezone.localdate()
@@ -113,40 +146,56 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
         anios.add(hoy.year)
         anio_param = self.request.GET.get("anio", "")
         anio = int(anio_param) if anio_param.isdigit() and int(anio_param) in anios else hoy.year
+        importe = self.request.GET.get("importe", "")
+        importe = importe if importe in self.IMPORTES else "total"
+        campo = "base_imponible" if importe == "base" else "total"
 
-        conteo = {
-            (fila["proveedor_id"], fila["mes"]): fila["n"]
-            for fila in FacturaRecibida.objects.sin_duplicados()
+        celdas: dict[tuple[int, int], Importes] = {}
+        for fila in (
+            FacturaRecibida.objects.sin_duplicados()
             .filter(recibida_en__year=anio)
+            .exclude(tipo=FacturaRecibida.Tipo.RECIBO)
             .annotate(mes=ExtractMonth("recibida_en"))
-            .values("proveedor_id", "mes")
-            .annotate(n=Count("id"))
-        }
+            .values_list("proveedor_id", "mes", "moneda", campo)
+        ):
+            proveedor_id, mes, moneda, valor = fila
+            celdas.setdefault((proveedor_id, mes), Importes()).sumar(moneda, valor)
+
         # Proveedores activos, más los inactivos que tuvieron facturas ese año
         proveedores = Proveedor.objects.filter(
             Q(activo=True) | Q(facturas__recibida_en__year=anio)
         ).distinct()
-        filas = [
-            {
-                "proveedor": proveedor,
-                "meses": [
+        total_meses = [Importes() for _ in range(12)]
+        total_anio = Importes()
+        filas = []
+        for proveedor in proveedores:
+            total_fila = Importes()
+            meses = []
+            for numero in range(1, 13):
+                celda = celdas.get((proveedor.pk, numero), Importes())
+                total_fila += celda
+                total_meses[numero - 1] += celda
+                meses.append(
                     {
                         "numero": numero,
                         "nombre": MESES[numero - 1],
-                        "facturas": conteo.get((proveedor.pk, numero), 0),
+                        "importes": celda,
+                        "facturas": celda.facturas,
                         "futuro": (anio, numero) > (hoy.year, hoy.month),
                     }
-                    for numero in range(1, 13)
-                ],
-            }
-            for proveedor in proveedores
-        ]
+                )
+            total_anio += total_fila
+            filas.append({"proveedor": proveedor, "meses": meses, "total": total_fila})
         return super().get_context_data(
             anio=anio,
             anios=sorted(anios, reverse=True),
+            importe=importe,
+            importes=self.IMPORTES,
             meses=MESES,
             mes_en_curso=hoy.month if anio == hoy.year else None,
             filas=filas,
+            total_meses=total_meses,
+            total_anio=total_anio,
             ocultar_filtro_proveedor=True,
             **kwargs,
         )

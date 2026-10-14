@@ -207,6 +207,10 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .tick { color: var(--ok); display: inline-flex; align-items: center; gap: 0.15rem; text-decoration: none; border-radius: 50%; }
 .tick:hover svg { transform: scale(1.15); }
 .tick svg { display: block; transition: transform 0.1s ease; }
+.matrix .amount { display: block; font-size: 0.75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.matrix .amount-missing { color: var(--rope); font-style: italic; }
+.matrix .col-total { background: var(--mist); font-weight: 700; }
+.matrix tfoot th, .matrix tfoot td { border-top: 2px solid var(--line); font-weight: 700; background: var(--mist); }
 .tick-count { font-size: 0.75rem; font-weight: 700; color: var(--ok); }
 .active-filter { display: inline-flex; gap: 0.5rem; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 0.2rem 0.4rem 0.2rem 0.8rem; margin: 0 0 1rem; }
 .active-filter a { text-decoration: none; color: var(--rope); padding: 0 0.35rem; }

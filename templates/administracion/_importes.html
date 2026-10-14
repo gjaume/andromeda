@@ -1,0 +1,1 @@
+{% load facturas %}{% for moneda, valor in importes.lista %}<span class="amount">{{ valor|dinero:moneda }}</span>{% endfor %}{% if importes.sin_importe %}<span class="amount amount-missing" title="{{ importes.sin_importe }} factura{{ importes.sin_importe|pluralize }} sin importe: no se pudo leer el PDF">+{{ importes.sin_importe }} sin importe</span>{% endif %}
