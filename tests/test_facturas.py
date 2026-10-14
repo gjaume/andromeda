@@ -340,3 +340,49 @@ def test_solo_administracion_puede_subir(client, make_user, correo_sin_pdf):
     client.force_login(make_user(email="eva@andronautic.com", departments=["Comercial"]))
     url = reverse("administracion:subir_facturas", args=[correo_sin_pdf.pk])
     assert client.post(url, {"archivos": [pdf()]}).status_code == 403
+
+
+# --- Descartar ------------------------------------------------------------------------------
+
+
+def test_descartar_un_correo_sin_factura(administracion, correo_sin_pdf, proveedor):
+    sin_factura = reverse("administracion:correos_sin_factura")
+    url = reverse("administracion:descartar_correo", args=[correo_sin_pdf.pk])
+    assert url in administracion.get(sin_factura).content.decode()
+
+    response = administracion.post(url, {"proveedor": proveedor.pk})
+
+    assert response.url == f"{sin_factura}?proveedor={proveedor.pk}"
+    correo_sin_pdf.refresh_from_db()
+    assert correo_sin_pdf.descartado_en is not None
+    assert correo_sin_pdf.descartado_por.email == "ana@andronautic.com"
+    html = administracion.get(sin_factura).content.decode()  # el mensaje cita el asunto
+    assert url not in html
+    assert "Nada pendiente" in html
+    assert '<span class="count">0</span>' in html
+
+
+def test_descartar_solo_por_post_y_por_administracion(client, make_user, correo_sin_pdf):
+    url = reverse("administracion:descartar_correo", args=[correo_sin_pdf.pk])
+    client.force_login(make_user(departments=["Administración"]))
+    assert client.get(url).status_code == 405
+    client.force_login(make_user(email="eva@andronautic.com", departments=["Comercial"]))
+    assert client.post(url).status_code == 403
+    correo_sin_pdf.refresh_from_db()
+    assert correo_sin_pdf.descartado_en is None
+
+
+def test_recuperar_descartados_desde_el_admin(client, make_user, correo_sin_pdf):
+    from django.utils import timezone
+
+    correo_sin_pdf.descartado_en = timezone.now()
+    correo_sin_pdf.save()
+    client.force_login(make_user(is_superuser=True, is_staff=True))
+
+    url = reverse("admin:administracion_correofactura_changelist")
+    assert "Su factura está en el portal" in client.get(f"{url}?descartado=si").content.decode()
+    client.post(url, {"action": "recuperar", "_selected_action": [correo_sin_pdf.pk]})
+
+    correo_sin_pdf.refresh_from_db()
+    assert correo_sin_pdf.descartado_en is None
+    assert CorreoFactura.objects.pendientes().filter(pk=correo_sin_pdf.pk).exists()

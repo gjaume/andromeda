@@ -8,7 +8,8 @@ from django.core.cache import cache
 from django.db.models import Count
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, FormView, ListView, TemplateView, UpdateView
 from django.views.generic.detail import SingleObjectMixin
@@ -51,7 +52,7 @@ class FacturasMixin(DepartmentRequiredMixin):
 
     def get_context_data(self, **kwargs):
         facturas = self.filtrar(FacturaRecibida.objects.all())
-        sin_factura = self.filtrar(CorreoFactura.objects.filter(facturas__isnull=True))
+        sin_factura = self.filtrar(CorreoFactura.objects.pendientes())
         return super().get_context_data(
             proveedores=Proveedor.objects.all(),
             proveedor_actual=self.proveedor,
@@ -81,8 +82,29 @@ class CorreoSinFacturaListView(FacturasMixin, ListView):
     context_object_name = "correos"
 
     def get_queryset(self):
-        correos = CorreoFactura.objects.filter(facturas__isnull=True).select_related("proveedor")
+        correos = CorreoFactura.objects.pendientes().select_related("proveedor")
         return self.filtrar(correos)
+
+
+class DescartarCorreoView(DepartmentRequiredMixin, View):
+    """Saca de "Correos sin factura" un correo que no trae factura (p. ej. una respuesta)."""
+
+    department = "administracion"
+
+    def post(self, request, pk):
+        correo = get_object_or_404(CorreoFactura, pk=pk)
+        correo.descartado_en = timezone.now()
+        correo.descartado_por = request.user
+        correo.save(update_fields=["descartado_en", "descartado_por"])
+        messages.success(
+            request,
+            f"Descartado «{correo.asunto or correo.gmail_id}». "
+            "Se puede recuperar desde el admin (Correos de facturas → Descartados).",
+        )
+        destino = reverse("administracion:correos_sin_factura")
+        if proveedor := request.POST.get("proveedor", ""):
+            destino += f"?proveedor={proveedor}" if proveedor.isdigit() else ""
+        return redirect(destino)
 
 
 class SubirFacturasView(DepartmentRequiredMixin, FormView):

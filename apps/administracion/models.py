@@ -35,6 +35,12 @@ class Proveedor(models.Model):
         return f"{settings.GMAIL['INVOICES_LABEL']}/{self.etiqueta_gmail}"
 
 
+class CorreoFacturaQuerySet(models.QuerySet):
+    def pendientes(self):
+        """Sin factura y sin descartar: falta bajar la factura a mano o decidir que no la hay."""
+        return self.filter(facturas__isnull=True, descartado_en__isnull=True)
+
+
 class CorreoFactura(models.Model):
     """Correo de Gmail ya revisado, tenga o no facturas, para no volver a descargarlo."""
 
@@ -44,6 +50,17 @@ class CorreoFactura(models.Model):
     remitente = models.CharField(max_length=320, blank=True)
     recibido_en = models.DateTimeField(db_index=True)
     procesado_en = models.DateTimeField(auto_now_add=True)
+    # Correos sin factura que no la necesitan (respuestas, avisos): salen de "Correos sin factura"
+    descartado_en = models.DateTimeField(null=True, blank=True)
+    descartado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="correos_descartados",
+    )
+
+    objects = CorreoFacturaQuerySet.as_manager()
 
     class Meta:
         ordering = ["-recibido_en"]

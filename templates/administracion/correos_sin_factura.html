@@ -3,7 +3,7 @@
 {% block content %}
 {% include "administracion/_facturas_cabecera.html" %}
 
-<p class="lede">Correos de proveedores que no traían ningún PDF adjunto. Suelen ser avisos con la factura en el portal del proveedor: descárgala y súbela con «Subir PDF» para que pase a Facturas.</p>
+<p class="lede">Correos de proveedores que no traían ningún PDF adjunto. Suelen ser avisos con la factura en el portal del proveedor: descárgala y súbela con «Subir PDF» para que pase a Facturas. Si el correo no lleva factura (una respuesta, un aviso), descártalo.</p>
 
 {% if correos %}
   <div class="table-wrap">
@@ -18,7 +18,14 @@
             <td>{{ c.proveedor.nombre }}</td>
             <td><a href="{{ c.gmail_url }}" target="_blank" rel="noopener">{{ c.asunto|default:"(sin asunto)" }}</a></td>
             <td class="muted">{{ c.remitente }}</td>
-            <td class="nowrap"><a class="button-secondary button-small" href="{% url 'administracion:subir_facturas' c.pk %}">Subir PDF</a></td>
+            <td class="row-actions">
+              <a class="button-secondary button-small" href="{% url 'administracion:subir_facturas' c.pk %}">Subir PDF</a>
+              <form method="post" action="{% url 'administracion:descartar_correo' c.pk %}">
+                {% csrf_token %}
+                {% if proveedor_actual %}<input type="hidden" name="proveedor" value="{{ proveedor_actual.pk }}">{% endif %}
+                <button type="submit" class="link-muted" title="No trae factura: quitar de esta lista">Descartar</button>
+              </form>
+            </td>
           </tr>
         {% endfor %}
       </tbody>

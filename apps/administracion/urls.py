@@ -18,6 +18,11 @@ urlpatterns = [
         name="subir_facturas",
     ),
     path(
+        "facturas/correos/<int:pk>/descartar/",
+        views.DescartarCorreoView.as_view(),
+        name="descartar_correo",
+    ),
+    path(
         "facturas/sincronizar/",
         views.SincronizarFacturasView.as_view(),
         name="facturas_sincronizar",

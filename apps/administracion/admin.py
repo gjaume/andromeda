@@ -36,6 +36,19 @@ class ConFacturaFilter(admin.SimpleListFilter):
         return queryset
 
 
+class DescartadoFilter(admin.SimpleListFilter):
+    title = "descartado"
+    parameter_name = "descartado"
+
+    def lookups(self, request, model_admin):
+        return [("si", "Descartados"), ("no", "No descartados")]
+
+    def queryset(self, request, queryset):
+        if self.value() in ("si", "no"):
+            return queryset.filter(descartado_en__isnull=self.value() == "no")
+        return queryset
+
+
 class FacturaInline(TabularInline):
     model = FacturaRecibida
     fields = (abrir_archivo, "tamano")
@@ -46,14 +59,22 @@ class FacturaInline(TabularInline):
 
 @admin.register(CorreoFactura)
 class CorreoFacturaAdmin(ModelAdmin):
-    list_display = ("recibido_en", "proveedor", "asunto", "remitente", "procesado_en")
-    list_filter = (ConFacturaFilter, "proveedor")
+    list_display = ("recibido_en", "proveedor", "asunto", "remitente", "descartado_en")
+    list_filter = (ConFacturaFilter, DescartadoFilter, "proveedor")
     search_fields = ("asunto", "remitente", "gmail_id")
     readonly_fields = [f.name for f in CorreoFactura._meta.fields]
     inlines = [FacturaInline]
+    actions = ["recuperar"]
 
     def has_add_permission(self, request):
         return False
+
+    @admin.action(description="Recuperar descartados (vuelven a «Correos sin factura»)")
+    def recuperar(self, request, queryset):
+        n = queryset.filter(descartado_en__isnull=False).update(
+            descartado_en=None, descartado_por=None
+        )
+        self.message_user(request, f"{n} correos recuperados.")
 
 
 @admin.register(FacturaRecibida)
