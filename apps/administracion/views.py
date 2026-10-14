@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import re
 from datetime import date
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
@@ -14,7 +15,14 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
-from django.views.generic import CreateView, FormView, ListView, TemplateView, UpdateView
+from django.views.generic import (
+    CreateView,
+    DetailView,
+    FormView,
+    ListView,
+    TemplateView,
+    UpdateView,
+)
 from django.views.generic.detail import SingleObjectMixin
 from django_q.models import Task
 from django_q.tasks import async_task
@@ -22,6 +30,7 @@ from django_q.tasks import async_task
 from core.departments import DepartmentRequiredMixin
 from integrations import gmail
 
+from .extraccion.servicio import extraer_datos
 from .facturas import subir_facturas
 from .forms import ProveedorForm, SubirFacturasForm
 from .models import CorreoFactura, FacturaRecibida, Proveedor
@@ -208,6 +217,32 @@ class SincronizarFacturasView(DepartmentRequiredMixin, View):
                 "Buscando facturas nuevas en Gmail. Recarga la página en un minuto para verlas.",
             )
         return redirect("administracion:facturas")
+
+
+class FacturaDetalleView(DepartmentRequiredMixin, DetailView):
+    department = "administracion"
+    template_name = "administracion/factura_detalle.html"
+    context_object_name = "factura"
+    queryset = FacturaRecibida.objects.select_related("proveedor", "correo", "subida_por")
+
+    def get_context_data(self, **kwargs):
+        lineas = list(self.object.lineas.all())
+        suma = sum((linea.importe for linea in lineas), Decimal(0))
+        return super().get_context_data(lineas=lineas, suma_lineas=suma, **kwargs)
+
+
+class FacturaExtraerView(DepartmentRequiredMixin, View):
+    """Vuelve a leer el PDF, p. ej. tras corregir un extractor o asignárselo al proveedor."""
+
+    department = "administracion"
+
+    def post(self, request, pk):
+        factura = extraer_datos(get_object_or_404(FacturaRecibida, pk=pk))
+        nivel = messages.SUCCESS if factura.extraccion_estado == "ok" else messages.WARNING
+        messages.add_message(
+            request, nivel, f"PDF leído de nuevo: {factura.get_extraccion_estado_display()}."
+        )
+        return redirect("administracion:factura_detalle", pk=pk)
 
 
 class FacturaArchivoView(DepartmentRequiredMixin, SingleObjectMixin, View):

@@ -5,6 +5,12 @@ from django.db import models
 from django.utils.text import slugify
 
 
+def opciones_extractores():
+    from .extraccion import registro
+
+    return [(clave, extractor.nombre) for clave, extractor in sorted(registro.items())]
+
+
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=200, unique=True)
     cif = models.CharField("CIF / NIF", max_length=20, blank=True)
@@ -17,6 +23,13 @@ class Proveedor(models.Model):
     )
     activo = models.BooleanField(
         default=True, help_text="Solo se buscan facturas de los proveedores activos."
+    )
+    extractor = models.CharField(
+        "formato de factura",
+        max_length=50,
+        blank=True,
+        choices=opciones_extractores,
+        help_text="Extractor que lee las líneas y totales de sus PDF. Vacío = no se extraen.",
     )
     notas = models.TextField(blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -100,6 +113,36 @@ class FacturaRecibida(models.Model):
     recibida_en = models.DateTimeField(db_index=True)
     creada_en = models.DateTimeField(auto_now_add=True)
 
+    # --- Datos extraídos del PDF (apps/administracion/extraccion) ---
+    class Tipo(models.TextChoices):
+        FACTURA = "factura", "Factura"
+        ABONO = "abono", "Factura rectificativa / abono"
+        RECIBO = "recibo", "Recibo de pago"
+
+    class Extraccion(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente"
+        OK = "ok", "Extraída"
+        REVISAR = "revisar", "Extraída, revisar"  # los importes no cuadran
+        ERROR = "error", "Error al extraer"
+        SIN_EXTRACTOR = "sin_extractor", "Sin extractor"
+
+    tipo = models.CharField(max_length=10, choices=Tipo.choices, blank=True)
+    numero_factura = models.CharField("nº de factura", max_length=100, blank=True)
+    fecha_factura = models.DateField(null=True, blank=True)
+    moneda = models.CharField(max_length=3, blank=True, help_text="Código ISO 4217: EUR, USD…")
+    base_imponible = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    impuestos = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    total = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    extraccion_estado = models.CharField(
+        "extracción",
+        max_length=15,
+        choices=Extraccion.choices,
+        default=Extraccion.PENDIENTE,
+        db_index=True,
+    )
+    extraccion_detalle = models.TextField("detalle de la extracción", blank=True)
+    extraida_en = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["-recibida_en", "-id"]
         verbose_name = "factura recibida"
@@ -118,3 +161,25 @@ class FacturaRecibida(models.Model):
     @property
     def subida_a_mano(self) -> bool:
         return not self.gmail_part_id
+
+
+class LineaFactura(models.Model):
+    factura = models.ForeignKey(FacturaRecibida, on_delete=models.CASCADE, related_name="lineas")
+    orden = models.PositiveSmallIntegerField(default=0)
+    descripcion = models.TextField()
+    cantidad = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    precio_unitario = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    importe = models.DecimalField(
+        max_digits=12, decimal_places=2, help_text="Importe de la línea sin impuestos."
+    )
+    impuesto_pct = models.DecimalField(
+        "% impuesto", max_digits=5, decimal_places=2, null=True, blank=True
+    )
+
+    class Meta:
+        ordering = ["factura", "orden"]
+        verbose_name = "línea de factura"
+        verbose_name_plural = "líneas de factura"
+
+    def __str__(self) -> str:
+        return self.descripcion[:80]

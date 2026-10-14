@@ -13,7 +13,7 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th scope="col">Nombre</th><th scope="col">CIF / NIF</th><th scope="col">Etiqueta de Gmail</th><th scope="col">Facturas</th><th scope="col">Estado</th></tr>
+        <tr><th scope="col">Nombre</th><th scope="col">CIF / NIF</th><th scope="col">Etiqueta de Gmail</th><th scope="col">Formato de factura</th><th scope="col">Facturas</th><th scope="col">Estado</th></tr>
       </thead>
       <tbody>
         {% for p in proveedores %}
@@ -21,6 +21,7 @@
             <td><a href="{% url 'administracion:proveedor_editar' p.pk %}">{{ p.nombre }}</a></td>
             <td>{{ p.cif|default:"—" }}</td>
             <td><code>{{ p.etiqueta_completa }}</code></td>
+            <td>{{ p.get_extractor_display|default:"—" }}</td>
             <td><a href="{% url 'administracion:facturas' %}?proveedor={{ p.pk }}">{{ p.num_facturas }}</a></td>
             <td>{% if p.activo %}Activo{% else %}<span class="muted">Inactivo</span>{% endif %}</td>
           </tr>

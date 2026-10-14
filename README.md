@@ -72,6 +72,17 @@ Herramienta de Administración: cada proveedor tiene una subetiqueta de Gmail de
 - Frecuencia: admin → Django Q → Tareas programadas → «Sincronizar facturas de Gmail».
 - Histórico completo: `uv run python manage.py sincronizar_facturas --dias 0`.
 
+### Datos de cada factura (líneas, totales y moneda)
+
+Al descargar o subir una factura se lee su PDF con el extractor del formato de su proveedor (`apps/administracion/extraccion/extractores/<clave>.py`, asignado en la ficha del proveedor como «formato de factura»). Se guardan nº, fecha, tipo (factura, abono o recibo), moneda, base, impuestos, total y las líneas. Cada factura queda en uno de estos estados:
+
+- **Extraída**: las líneas suman la base y base + impuestos = total.
+- **Extraída, revisar**: se guardó, pero los importes no cuadran (suele indicar que el proveedor cambió el formato).
+- **Error al extraer**: el PDF no tiene el formato esperado; el motivo se ve en la ficha de la factura.
+- **Sin extractor**: el proveedor no tiene formato asignado.
+
+Para un proveedor nuevo: `uv run python manage.py extraer_facturas --proveedor <nombre> --texto plano` muestra el texto que ve el extractor; se crea `extractores/<clave>.py` siguiendo uno existente (p. ej. `hetzner.py`), con su test en `tests/extractores/`, y se prueba con `--probar`, que no guarda nada. Después, `extraer_facturas --proveedor <nombre>` (o «Volver a leer el PDF» en la ficha) aplica el extractor.
+
 ### Acceso al buzón
 
 El proceso lee el buzón sin que nadie inicie sesión, con una cuenta de servicio de Google Workspace:

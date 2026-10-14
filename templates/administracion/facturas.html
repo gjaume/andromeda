@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load facturas %}
 {% block title %}Facturas recibidas{% endblock %}
 {% block content %}
 {% include "administracion/_facturas_cabecera.html" %}
@@ -11,15 +12,24 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th scope="col">Recibida</th><th scope="col">Proveedor</th><th scope="col">Factura</th><th scope="col">Asunto del correo</th></tr>
+        <tr><th scope="col">Recibida</th><th scope="col">Proveedor</th><th scope="col">Factura</th><th scope="col" class="num">Total</th><th scope="col"><span class="sr-only">Detalle</span></th></tr>
       </thead>
       <tbody>
         {% for f in facturas %}
           <tr>
             <td class="nowrap">{{ f.recibida_en|date:"d/m/Y H:i" }}</td>
             <td>{{ f.proveedor.nombre }}</td>
-            <td><a href="{% url 'administracion:factura_archivo' f.pk %}" target="_blank" rel="noopener">{{ f.nombre_archivo }}</a> <span class="muted">{{ f.tamano|filesizeformat }}</span>{% if f.subida_a_mano %} <span class="tag" title="Subida por {{ f.subida_por.email|default:'—' }}">subida a mano</span>{% endif %}</td>
-            <td><a href="{{ f.correo.gmail_url }}" target="_blank" rel="noopener" class="muted">{{ f.correo.asunto|default:"(sin asunto)" }}</a></td>
+            <td>
+              <a href="{% url 'administracion:factura_archivo' f.pk %}" target="_blank" rel="noopener">{{ f.nombre_archivo }}</a>
+              {% if f.subida_a_mano %}<span class="tag" title="Subida por {{ f.subida_por.email|default:'—' }}">subida a mano</span>{% endif %}
+              {% if f.tipo and f.tipo != "factura" %}<span class="tag tag-muted">{{ f.get_tipo_display }}</span>{% endif %}
+              {% if f.numero_factura or f.fecha_factura %}<br><span class="muted small">Nº {{ f.numero_factura|default:"—" }}{% if f.fecha_factura %} · {{ f.fecha_factura|date:"d/m/Y" }}{% endif %}</span>{% endif %}
+            </td>
+            <td class="num nowrap">
+              {% if f.total is not None %}{{ f.total|dinero:f.moneda }}{% endif %}
+              {% if f.extraccion_estado != "ok" %}<br>{% include "administracion/_estado_extraccion.html" with factura=f %}{% endif %}
+            </td>
+            <td class="nowrap"><a href="{% url 'administracion:factura_detalle' f.pk %}">Detalle</a></td>
           </tr>
         {% endfor %}
       </tbody>

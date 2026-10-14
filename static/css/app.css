@@ -163,6 +163,28 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .tabs a[aria-current="page"] { color: var(--harbour); border-bottom-color: var(--signal); }
 .tabs .count { display: inline-block; min-width: 1.6em; padding: 0 0.4em; margin-left: 0.3rem; font-size: 0.8rem; text-align: center; border-radius: 999px; background: var(--line); color: var(--ink); }
 
+/* Datos extraídos de las facturas */
+.num, .table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.small { font-size: 0.85rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.tag-muted { background: var(--line); }
+.estado { display: inline-block; padding: 0 0.45em; font-size: 0.75rem; border-radius: 3px; background: var(--line); color: var(--ink); cursor: help; }
+.estado-revisar { background: #FCE8B2; }
+.estado-error { background: #F6D5D3; color: var(--danger); }
+.estado-ok { background: #D6EBDF; color: var(--ok); }
+.msg-warning { border-left-color: var(--signal); }
+.actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.summary { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1.5rem; }
+.summary .mail-summary { margin: 0; flex: 1 1 22rem; }
+.totals { margin: 0; display: grid; gap: 0.5rem; min-width: 14rem; }
+.totals div { display: flex; justify-content: space-between; gap: 1.5rem; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 0.55rem 0.9rem; }
+.totals dt { color: var(--rope); }
+.totals dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 700; }
+.totals .total { border-color: var(--harbour); }
+.totals .total dd { font-size: var(--step-1); }
+.section-title { font-size: var(--step-1); margin: 0 0 0.5rem; }
+.table tfoot th, .table tfoot td { font-weight: 700; background: var(--mist); }
+
 /* Vista proveedores × meses */
 .matrix { font-size: 0.9rem; }
 .matrix th, .matrix td { padding: 0.45rem 0.4rem; text-align: center; vertical-align: middle; }

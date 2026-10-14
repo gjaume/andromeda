@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load facturas %}
+{% block title %}{{ factura.proveedor.nombre }} · {{ factura.numero_factura|default:factura.nombre_archivo }}{% endblock %}
+{% block content %}
+<header class="page-head page-head-actions">
+  <div>
+    <p class="crumb"><a href="{% url 'administracion:facturas' %}?proveedor={{ factura.proveedor.pk }}">← Facturas de {{ factura.proveedor.nombre }}</a></p>
+    <h1>{{ factura.get_tipo_display|default:"Factura" }} {{ factura.numero_factura }}</h1>
+    <p class="lede">{{ factura.proveedor.nombre }}{% if factura.fecha_factura %} · emitida el {{ factura.fecha_factura|date:"j \d\e F \d\e Y" }}{% endif %}</p>
+  </div>
+  <div class="actions">
+    <a class="button" href="{% url 'administracion:factura_archivo' factura.pk %}" target="_blank" rel="noopener">Abrir PDF</a>
+    <form method="post" action="{% url 'administracion:factura_extraer' factura.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="button-secondary">Volver a leer el PDF</button>
+    </form>
+  </div>
+</header>
+
+<section class="summary">
+  <dl class="totals">
+    <div><dt>Base imponible</dt><dd>{{ factura.base_imponible|dinero:factura.moneda }}</dd></div>
+    <div><dt>Impuestos</dt><dd>{{ factura.impuestos|dinero:factura.moneda }}</dd></div>
+    <div class="total"><dt>Total</dt><dd>{{ factura.total|dinero:factura.moneda }}</dd></div>
+  </dl>
+  <dl class="mail-summary">
+    <dt>Moneda</dt><dd>{{ factura.moneda|default:"—" }}</dd>
+    <dt>Recibida</dt><dd>{{ factura.recibida_en|date:"d/m/Y H:i" }}</dd>
+    <dt>Correo</dt><dd><a href="{{ factura.correo.gmail_url }}" target="_blank" rel="noopener">{{ factura.correo.asunto|default:"(sin asunto)" }}</a></dd>
+    <dt>Fichero</dt><dd>{{ factura.nombre_archivo }}{% if factura.subida_a_mano %} <span class="tag">subida a mano</span>{% endif %}</dd>
+    <dt>Extracción</dt><dd>{% include "administracion/_estado_extraccion.html" %}{% if factura.extraida_en %} <span class="muted small">{{ factura.extraida_en|date:"d/m/Y H:i" }}</span>{% endif %}</dd>
+  </dl>
+</section>
+
+{% if factura.extraccion_detalle %}
+  <div class="msg {% if factura.extraccion_estado == 'error' %}msg-error{% else %}msg-warning{% endif %}">
+    {{ factura.extraccion_detalle|linebreaksbr }}
+  </div>
+{% elif factura.extraccion_estado == "sin_extractor" %}
+  <p class="msg">El proveedor no tiene asignado un formato de factura, así que no se leen sus líneas. Se asigna en la <a href="{% url 'administracion:proveedor_editar' factura.proveedor.pk %}">ficha del proveedor</a>.</p>
+{% endif %}
+
+<h2 class="section-title">Líneas</h2>
+{% if lineas %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Concepto</th><th scope="col" class="num">Cantidad</th><th scope="col" class="num">Precio</th><th scope="col" class="num">% imp.</th><th scope="col" class="num">Importe</th></tr>
+      </thead>
+      <tbody>
+        {% for l in lineas %}
+          <tr>
+            <td>{{ l.descripcion }}</td>
+            <td class="num">{{ l.cantidad|numero }}</td>
+            <td class="num nowrap">{{ l.precio_unitario|numero }}</td>
+            <td class="num">{% if l.impuesto_pct is not None %}{{ l.impuesto_pct|numero }} %{% endif %}</td>
+            <td class="num nowrap">{{ l.importe|dinero:factura.moneda }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><th scope="row" colspan="4">Suma de líneas</th><td class="num nowrap">{{ suma_lineas|dinero:factura.moneda }}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+{% else %}
+  <p class="muted">No hay líneas extraídas.</p>
+{% endif %}
+{% endblock %}

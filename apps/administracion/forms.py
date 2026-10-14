@@ -7,7 +7,7 @@ from .models import Proveedor
 class ProveedorForm(forms.ModelForm):
     class Meta:
         model = Proveedor
-        fields = ["nombre", "cif", "email", "etiqueta_gmail", "activo", "notas"]
+        fields = ["nombre", "cif", "email", "etiqueta_gmail", "extractor", "activo", "notas"]
         widgets = {
             "etiqueta_gmail": forms.TextInput(attrs={"list": "etiquetas-gmail"}),
             "notas": forms.Textarea(attrs={"rows": 3}),

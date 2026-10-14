@@ -211,7 +211,9 @@ def test_listado_y_descarga_de_facturas(administracion, api, gmail, proveedor):
 
     html = administracion.get(reverse("administracion:facturas")).content.decode()
     assert "f.pdf" in html
-    assert "Factura octubre" in html
+    detalle = reverse("administracion:factura_detalle", args=[factura.pk])
+    assert detalle in html
+    assert "Factura octubre" in administracion.get(detalle).content.decode()
 
     response = administracion.get(reverse("administracion:factura_archivo", args=[factura.pk]))
     assert response["Content-Type"] == "application/pdf"

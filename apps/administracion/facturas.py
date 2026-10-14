@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from integrations.gmail import GmailAuthError, GmailClient, GmailError, GmailMessage, get_client
 
+from .extraccion.servicio import extraer_datos
 from .models import CorreoFactura, FacturaRecibida, Proveedor
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,7 @@ def _guardar_correo(gmail: GmailClient, proveedor: Proveedor, mensaje: GmailMess
     adjuntos = [a for a in mensaje.attachments if es_factura(a.filename)]
     contenidos = [(a, gmail.attachment_content(mensaje.id, a)) for a in adjuntos]
 
+    facturas = []
     with transaction.atomic():
         correo = CorreoFactura.objects.create(
             proveedor=proveedor,
@@ -123,7 +125,10 @@ def _guardar_correo(gmail: GmailClient, proveedor: Proveedor, mensaje: GmailMess
             )
             factura.archivo.save(adjunto.filename, ContentFile(contenido), save=False)
             factura.save()
-    return len(contenidos)
+            facturas.append(factura)
+    for factura in facturas:
+        extraer_datos(factura)
+    return len(facturas)
 
 
 def subir_facturas(correo: CorreoFactura, archivos, usuario) -> list[FacturaRecibida]:
@@ -142,4 +147,6 @@ def subir_facturas(correo: CorreoFactura, archivos, usuario) -> list[FacturaReci
             factura.archivo.save(archivo.name, archivo, save=False)
             factura.save()
             facturas.append(factura)
+    for factura in facturas:
+        extraer_datos(factura)
     return facturas
