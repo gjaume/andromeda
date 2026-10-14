@@ -1,0 +1,38 @@
+<header class="page-head page-head-actions">
+  <div>
+    <h1>Facturas recibidas</h1>
+    <p class="lede">
+      Se descargan solas desde Gmail cada pocas horas, a partir de las etiquetas de cada
+      <a href="{% url 'administracion:proveedores' %}">proveedor</a>.
+      {% if ultima_sincronizacion %}
+        Última búsqueda: {{ ultima_sincronizacion.stopped|date:"j M Y, H:i" }}{% if not ultima_sincronizacion.success %} <strong class="text-danger">(falló)</strong>{% endif %}.
+      {% endif %}
+    </p>
+  </div>
+  <form method="post" action="{% url 'administracion:facturas_sincronizar' %}">
+    {% csrf_token %}
+    <button type="submit" class="button" {% if not gmail_configurado %}disabled title="Gmail no está configurado"{% endif %}>Buscar facturas ahora</button>
+  </form>
+</header>
+
+{% if not gmail_configurado %}
+  <p class="msg msg-error">Gmail no está configurado todavía (falta <code>GMAIL_SERVICE_ACCOUNT_JSON</code>), así que no se descargarán facturas.</p>
+{% endif %}
+
+{% url 'administracion:facturas' as url_facturas %}
+{% url 'administracion:correos_sin_factura' as url_sin_factura %}
+<nav class="tabs" aria-label="Vistas">
+  <a href="{{ url_facturas }}{% if proveedor_actual %}?proveedor={{ proveedor_actual.pk }}{% endif %}" {% if request.path == url_facturas %}aria-current="page"{% endif %}>Facturas <span class="count">{{ total_facturas }}</span></a>
+  <a href="{{ url_sin_factura }}{% if proveedor_actual %}?proveedor={{ proveedor_actual.pk }}{% endif %}" {% if request.path == url_sin_factura %}aria-current="page"{% endif %}>Correos sin factura <span class="count">{{ total_sin_factura }}</span></a>
+</nav>
+
+<form method="get" class="filters">
+  <label for="f-proveedor">Proveedor</label>
+  <select id="f-proveedor" name="proveedor" onchange="this.form.submit()">
+    <option value="">Todos</option>
+    {% for p in proveedores %}
+      <option value="{{ p.pk }}" {% if p == proveedor_actual %}selected{% endif %}>{{ p.nombre }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button type="submit" class="button-secondary">Filtrar</button></noscript>
+</form>

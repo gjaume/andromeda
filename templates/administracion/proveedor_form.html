@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}{{ object.nombre }}{% else %}Nuevo proveedor{% endif %}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <p class="crumb"><a href="{% url 'administracion:proveedores' %}">← Proveedores</a></p>
+  <h1>{% if object %}{{ object.nombre }}{% else %}Nuevo proveedor{% endif %}</h1>
+</header>
+
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}
+    <div class="field{% if field.errors %} has-error{% endif %}{% if field.field.widget.input_type == 'checkbox' %} field-check{% endif %}">
+      {% if field.field.widget.input_type == 'checkbox' %}
+        {{ field }} {{ field.label_tag }}
+      {% else %}
+        {{ field.label_tag }} {{ field }}
+      {% endif %}
+      {% if field.name == "etiqueta_gmail" %}
+        <p class="help">Nombre de la subetiqueta dentro de «{{ etiqueta_padre }}» en Gmail{% if etiquetas_gmail %}; empieza a escribir para ver las que existen{% endif %}.</p>
+      {% elif field.help_text %}
+        <p class="help">{{ field.help_text }}</p>
+      {% endif %}
+      {% for error in field.errors %}<p class="error">{{ error }}</p>{% endfor %}
+    </div>
+  {% endfor %}
+  {% if etiquetas_gmail %}
+    <datalist id="etiquetas-gmail">{% for e in etiquetas_gmail %}<option value="{{ e }}">{% endfor %}</datalist>
+  {% endif %}
+  <div class="form-actions">
+    <button type="submit" class="button">Guardar</button>
+    <a href="{% url 'administracion:proveedores' %}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

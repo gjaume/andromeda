@@ -174,6 +174,17 @@ POPEYE_API = {
     "MAX_RETRIES": env.int("POPEYE_API_MAX_RETRIES", default=3),
 }
 
+# --- Gmail: facturas de proveedores en el buzón de administración -------------------------
+GMAIL = {
+    "MAILBOX": env("GMAIL_MAILBOX", default="admin@andronautic.com"),
+    # JSON de la clave de la cuenta de servicio (o ruta al fichero), con delegación de dominio
+    "SERVICE_ACCOUNT_JSON": env("GMAIL_SERVICE_ACCOUNT_JSON", default=""),
+    # Etiqueta padre; cada proveedor tiene una subetiqueta "Gastos/<proveedor>"
+    "INVOICES_LABEL": env("GMAIL_INVOICES_LABEL", default="Gastos"),
+    # Ventana de búsqueda de cada sincronización programada
+    "SYNC_DAYS": env.int("GMAIL_SYNC_DAYS", default=30),
+}
+
 # --- Departamentos --------------------------------------------------------------------------
 # Cada departamento es un Group de Django. La navegación y los permisos de las vistas salen de aquí.
 DEPARTMENTS = {

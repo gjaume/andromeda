@@ -116,6 +116,67 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .button-primary:hover { background: var(--harbour-soft); }
 .hint { color: var(--rope); font-size: 0.9rem; margin: 1rem 0 0; }
 
+/* Botones */
+.button, .button-secondary {
+  display: inline-block;
+  padding: 0.55rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.button { color: #fff; background: var(--harbour); border: 0; }
+.button:hover { background: var(--harbour-soft); }
+.button:disabled { background: var(--rope); cursor: not-allowed; }
+.button-secondary { color: var(--harbour); background: var(--paper); border: 1px solid var(--line); }
+
+.page-head-actions { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.page-head-actions .lede { margin-bottom: 1.5rem; }
+.crumb { margin: 0 0 0.5rem; font-size: 0.9rem; }
+.muted { color: var(--rope); }
+.text-danger { color: var(--danger); }
+.nowrap { white-space: nowrap; }
+
+/* Tablas */
+.table-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.table th, .table td { padding: 0.65rem 0.9rem; text-align: left; border-top: 1px solid var(--line); vertical-align: top; }
+.table thead th { border-top: 0; font-size: 0.85rem; color: var(--rope); background: var(--mist); }
+.table td a.muted { text-decoration: none; }
+.table td a.muted:hover { text-decoration: underline; }
+
+.tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid var(--line); margin-bottom: 1rem; flex-wrap: wrap; }
+.tabs a { padding: 0.55rem 0.9rem; text-decoration: none; color: var(--rope); font-weight: 700; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.tabs a:hover { color: var(--harbour); }
+.tabs a[aria-current="page"] { color: var(--harbour); border-bottom-color: var(--signal); }
+.tabs .count { display: inline-block; min-width: 1.6em; padding: 0 0.4em; margin-left: 0.3rem; font-size: 0.8rem; text-align: center; border-radius: 999px; background: var(--line); color: var(--ink); }
+
+.filters { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.filters label { font-weight: 700; }
+.filters select, .form input, .form select, .form textarea {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.pagination { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
+
+/* Formularios */
+.form { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 1.5rem; max-width: 36rem; }
+.field { margin-bottom: 1.1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.field label { font-weight: 700; }
+.field input:not([type="checkbox"]), .field textarea { width: 100%; }
+.field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
+.field-check input { width: 1.1rem; height: 1.1rem; }
+.help { color: var(--rope); font-size: 0.875rem; margin: 0; }
+.error, .errorlist { color: var(--danger); font-size: 0.9rem; margin: 0; }
+.has-error input, .has-error textarea { border-color: var(--danger); }
+.form-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; }
+
 @media (max-width: 760px) {
   body { grid-template-columns: 1fr; }
   .sidebar { position: fixed; inset: 0 auto 0 0; width: min(18rem, 85vw); transform: translateX(-100%); z-index: 10; transition: transform 0.2s ease; }

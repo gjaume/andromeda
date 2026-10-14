@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Correos sin factura{% endblock %}
+{% block content %}
+{% include "administracion/_facturas_cabecera.html" %}
+
+<p class="lede">Correos de proveedores que no traían ningún PDF adjunto. Suelen ser avisos con la factura en el portal del proveedor, que hay que descargar a mano, o respuestas dentro de un hilo.</p>
+
+{% if correos %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Recibido</th><th scope="col">Proveedor</th><th scope="col">Asunto</th><th scope="col">Remitente</th></tr>
+      </thead>
+      <tbody>
+        {% for c in correos %}
+          <tr>
+            <td class="nowrap">{{ c.recibido_en|date:"d/m/Y H:i" }}</td>
+            <td>{{ c.proveedor.nombre }}</td>
+            <td><a href="{{ c.gmail_url }}" target="_blank" rel="noopener">{{ c.asunto|default:"(sin asunto)" }}</a></td>
+            <td class="muted">{{ c.remitente }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "administracion/_paginacion.html" %}
+{% else %}
+  <section class="empty-state">
+    <h2>Nada pendiente</h2>
+    <p>Todos los correos de proveedores traían su factura en PDF.</p>
+  </section>
+{% endif %}
+{% endblock %}

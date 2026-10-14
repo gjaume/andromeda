@@ -63,6 +63,26 @@ Todo acceso a popeye pasa por `integrations/popeye/`:
 
 Si el API usa otra cabecera o esquema de autenticación, ajusta `POPEYE_API_AUTH_HEADER` y `POPEYE_API_AUTH_SCHEME` (por ejemplo `X-Api-Key` y esquema vacío).
 
+## Facturas de proveedores (Gmail)
+
+Herramienta de Administración: cada proveedor tiene una subetiqueta de Gmail dentro de `Gastos` (p. ej. `Gastos/Iberdrola`), a la que una regla de Gmail envía sus correos. Cada 4 horas la tarea `sincronizar_facturas_gmail` revisa esas etiquetas en el buzón `admin@andronautic.com`, descarga los PDF adjuntos de los correos nuevos y los guarda en **Facturas recibidas**. Cada correo se procesa una sola vez, tenga o no factura.
+
+- Proveedores: `/administracion/proveedores/`. La etiqueta se escribe sin el prefijo `Gastos/`.
+- Facturas: `/administracion/facturas/`, con botón para buscar en el momento.
+- Frecuencia: admin → Django Q → Tareas programadas → «Sincronizar facturas de Gmail».
+- Histórico completo: `uv run python manage.py sincronizar_facturas --dias 0`.
+
+### Acceso al buzón
+
+El proceso lee el buzón sin que nadie inicie sesión, con una cuenta de servicio de Google Workspace:
+
+1. En Google Cloud Console (proyecto de la organización), activa la **Gmail API**.
+2. Crea una **cuenta de servicio** y descarga una clave en JSON.
+3. En la consola de administración de Workspace → Seguridad → Controles de API → **Delegación de todo el dominio**, autoriza el *client ID* de la cuenta de servicio con el scope `https://www.googleapis.com/auth/gmail.readonly`.
+4. Pon en `GMAIL_SERVICE_ACCOUNT_JSON` el contenido del JSON (en Render) o la ruta al fichero (en local, fuera del repo).
+
+El acceso es de solo lectura: el proceso no marca, mueve ni borra correos.
+
 ## Despliegue en Render
 
 `render.yaml` define un Blueprint con web service, worker y Postgres gestionado en Frankfurt:
@@ -81,7 +101,7 @@ La aplicación es un contenedor sin estado: si en algún momento se aloja en la 
 config/          settings por entorno (base, dev, test, prod), urls, wsgi
 core/            SSO, departamentos, navegación, auditoría de popeye, layout
 apps/            una app por departamento
-integrations/    clientes de servicios externos (popeye)
+integrations/    clientes de servicios externos (popeye, gmail)
 templates/       base, login y plantillas por departamento
 static/          estilos
 tests/           pytest

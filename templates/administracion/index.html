@@ -3,6 +3,19 @@
 {% block content %}
 <header class="page-head">
   <h1>Administración</h1>
-  <p class="lede">Aún no hay herramientas en este departamento. Cada nueva herramienta se registra en <code>apps/administracion/apps.py</code> y aparece aquí y en el menú lateral.</p>
+  <p class="lede">Herramientas del departamento de Administración.</p>
 </header>
+
+<section class="tool-list">
+  <ul>
+    <li>
+      <a href="{% url 'administracion:facturas' %}">Facturas recibidas</a>
+      <p>Facturas de proveedores descargadas automáticamente desde el buzón de administración.</p>
+    </li>
+    <li>
+      <a href="{% url 'administracion:proveedores' %}">Proveedores</a>
+      <p>Alta de proveedores y la etiqueta de Gmail donde llegan sus facturas.</p>
+    </li>
+  </ul>
+</section>
 {% endblock %}

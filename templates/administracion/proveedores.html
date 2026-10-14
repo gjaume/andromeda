@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Proveedores{% endblock %}
+{% block content %}
+<header class="page-head page-head-actions">
+  <div>
+    <h1>Proveedores</h1>
+    <p class="lede">Cada proveedor se asocia a su etiqueta de Gmail dentro de «Gastos». Las facturas que lleguen a esa etiqueta se guardan en <a href="{% url 'administracion:facturas' %}">Facturas recibidas</a>.</p>
+  </div>
+  <a class="button" href="{% url 'administracion:proveedor_nuevo' %}">Nuevo proveedor</a>
+</header>
+
+{% if proveedores %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Nombre</th><th scope="col">CIF / NIF</th><th scope="col">Etiqueta de Gmail</th><th scope="col">Facturas</th><th scope="col">Estado</th></tr>
+      </thead>
+      <tbody>
+        {% for p in proveedores %}
+          <tr>
+            <td><a href="{% url 'administracion:proveedor_editar' p.pk %}">{{ p.nombre }}</a></td>
+            <td>{{ p.cif|default:"—" }}</td>
+            <td><code>{{ p.etiqueta_completa }}</code></td>
+            <td><a href="{% url 'administracion:facturas' %}?proveedor={{ p.pk }}">{{ p.num_facturas }}</a></td>
+            <td>{% if p.activo %}Activo{% else %}<span class="muted">Inactivo</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <section class="empty-state">
+    <h2>Aún no hay proveedores</h2>
+    <p>Da de alta el primero con el nombre de su subetiqueta de Gmail.</p>
+  </section>
+{% endif %}
+{% endblock %}

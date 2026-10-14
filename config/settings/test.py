@@ -17,5 +17,11 @@ POPEYE_API = {
     "TIMEOUT": 2.0,
     "MAX_RETRIES": 3,
 }
+GMAIL = {
+    "MAILBOX": "admin@andronautic.com",
+    "SERVICE_ACCOUNT_JSON": "",
+    "INVOICES_LABEL": "Gastos",
+    "SYNC_DAYS": 30,
+}
 Q_CLUSTER = {"name": "test", "orm": "default", "sync": True, "timeout": 60, "retry": 120}
 MIDDLEWARE = [m for m in MIDDLEWARE if "whitenoise" not in m]  # noqa: F405

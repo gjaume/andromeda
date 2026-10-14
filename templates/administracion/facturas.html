@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Facturas recibidas{% endblock %}
+{% block content %}
+{% include "administracion/_facturas_cabecera.html" %}
+
+{% if facturas %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Recibida</th><th scope="col">Proveedor</th><th scope="col">Factura</th><th scope="col">Asunto del correo</th></tr>
+      </thead>
+      <tbody>
+        {% for f in facturas %}
+          <tr>
+            <td class="nowrap">{{ f.recibida_en|date:"d/m/Y H:i" }}</td>
+            <td>{{ f.proveedor.nombre }}</td>
+            <td><a href="{% url 'administracion:factura_archivo' f.pk %}" target="_blank" rel="noopener">{{ f.nombre_archivo }}</a> <span class="muted">{{ f.tamano|filesizeformat }}</span></td>
+            <td><a href="{{ f.correo.gmail_url }}" target="_blank" rel="noopener" class="muted">{{ f.correo.asunto|default:"(sin asunto)" }}</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "administracion/_paginacion.html" %}
+{% else %}
+  <section class="empty-state">
+    <h2>Todavía no hay facturas</h2>
+    {% if proveedores %}
+      <p>Aparecerán aquí en cuanto llegue un PDF a alguna de las etiquetas de Gmail de los proveedores.</p>
+    {% else %}
+      <p>Empieza <a href="{% url 'administracion:proveedor_nuevo' %}">dando de alta un proveedor</a> con su etiqueta de Gmail.</p>
+    {% endif %}
+  </section>
+{% endif %}
+{% endblock %}

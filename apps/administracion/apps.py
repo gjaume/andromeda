@@ -17,3 +17,19 @@ class AdministracionConfig(AppConfig):
                 description="Punto de partida para las herramientas de Administración.",
             ),
         )
+        register_tool(
+            "administracion",
+            Tool(
+                label="Facturas recibidas",
+                url_name="administracion:facturas",
+                description="Facturas de proveedores descargadas automáticamente desde Gmail.",
+            ),
+        )
+        register_tool(
+            "administracion",
+            Tool(
+                label="Proveedores",
+                url_name="administracion:proveedores",
+                description="Proveedores y la etiqueta de Gmail donde llegan sus facturas.",
+            ),
+        )
