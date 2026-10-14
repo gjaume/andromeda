@@ -37,6 +37,8 @@ API_URL = "https://www.googleapis.com/drive/v3/"
 UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 CARPETA = "application/vnd.google-apps.folder"
+HOJA_DE_CALCULO = "application/vnd.google-apps.spreadsheet"
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 CAMPOS_FICHERO = "id,name,mimeType,md5Checksum,parents"
 
 
@@ -148,6 +150,21 @@ class DriveClient:
             carpeta_id = carpeta.id
         return carpeta_id
 
+    def fichero(self, carpeta_id: str, nombre: str) -> DriveFile | None:
+        """Fichero (no carpeta) con ese nombre directamente dentro de la carpeta."""
+        return next(
+            (f for f in self.hijos(carpeta_id) if f.name == nombre and not f.es_carpeta), None
+        )
+
+    def descargar(self, fichero: DriveFile) -> bytes:
+        """Contenido del fichero. Las hojas de cálculo de Google se exportan como .xlsx."""
+        if fichero.mime_type == HOJA_DE_CALCULO:
+            url = f"{API_URL}files/{fichero.id}/export"
+            return self._get_bytes(url, {"mimeType": XLSX})
+        return self._get_bytes(
+            f"{API_URL}files/{fichero.id}", {"alt": "media", "supportsAllDrives": "true"}
+        )
+
     def crear_carpeta(self, padre_id: str, nombre: str) -> DriveFile:
         data = self._enviar(
             "POST",
@@ -201,6 +218,12 @@ class DriveClient:
         return {**(headers or {}), "Authorization": f"Bearer {self._token_provider()}"}
 
     def _get(self, url: str, params: dict[str, Any]) -> Any:
+        return self._get_response(url, params).json()
+
+    def _get_bytes(self, url: str, params: dict[str, Any]) -> bytes:
+        return self._get_response(url, params).content
+
+    def _get_response(self, url: str, params: dict[str, Any]) -> httpx.Response:
         last_error = ""
         for attempt in range(1, self.max_retries + 1):
             try:
@@ -209,7 +232,7 @@ class DriveClient:
                 last_error = str(exc)
             else:
                 if response.status_code < 400:
-                    return response.json()
+                    return response
                 if response.status_code != 429 and response.status_code < 500:
                     self._raise_for_status(response)
                 last_error = f"HTTP {response.status_code}"

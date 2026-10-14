@@ -35,7 +35,7 @@ from .drive import facturas_a_subir
 from .extraccion.servicio import extraer_datos
 from .facturas import subir_facturas
 from .forms import ProveedorForm, SubirFacturasForm
-from .models import CorreoFactura, Empresa, FacturaRecibida, Proveedor
+from .models import CorreoFactura, Empresa, FacturaRecibida, MetodoPago, Proveedor
 
 logger = logging.getLogger(__name__)
 
@@ -122,13 +122,29 @@ FILTROS_CONTABILIDAD = {
 }
 
 
+PENDIENTE_DE_PAGO = (
+    Q(
+        metodo_pago="",
+        duplicada_de__isnull=True,
+        total__isnull=False,
+    )
+    & ~Q(tipo__in=FacturaRecibida.TIPOS_NO_GASTO)
+    & (~Q(empresa__extracto_banco="") | ~Q(empresa__extracto_tarjeta=""))
+)
+FILTROS_PAGO = {
+    "pagada": ("Pagadas", ~Q(metodo_pago="")),
+    "pendiente": ("Sin pago encontrado", PENDIENTE_DE_PAGO),
+    **{m.value: (f"Pagadas por {m.label.lower()}", Q(metodo_pago=m.value)) for m in MetodoPago},
+}
+
+
 class FacturaListView(FacturasMixin, ListView):
     template_name = "administracion/facturas.html"
     context_object_name = "facturas"
 
     def get_queryset(self):
         facturas = FacturaRecibida.objects.select_related(
-            "proveedor", "correo", "subida_por", "duplicada_de", "empresa"
+            "proveedor", "correo", "subida_por", "duplicada_de", "empresa", "pago"
         )
         # ?mes=AAAA-MM[&fecha=correo], al pulsar una casilla de la vista por meses
         self.mes = None
@@ -147,6 +163,12 @@ class FacturaListView(FacturasMixin, ListView):
             facturas = facturas.sin_duplicados().filter(filtro)
         else:
             self.contabilidad = ""
+        # ?pago=pagada|pendiente|tarjeta|domiciliacion|transferencia
+        self.pago = self.request.GET.get("pago", "")
+        if self.pago in FILTROS_PAGO:
+            facturas = facturas.filter(FILTROS_PAGO[self.pago][1])
+        else:
+            self.pago = ""
         return self.filtrar(self.filtrar_empresa(facturas))
 
     def get_context_data(self, **kwargs):
@@ -155,6 +177,8 @@ class FacturaListView(FacturasMixin, ListView):
             criterio_fecha=self.criterio_fecha,
             contabilidad=self.contabilidad,
             filtros_contabilidad={k: v[0] for k, v in FILTROS_CONTABILIDAD.items()},
+            pago=self.pago,
+            filtros_pago={k: v[0] for k, v in FILTROS_PAGO.items()},
             **self.contexto_empresa(),
             **kwargs,
         )
@@ -362,15 +386,17 @@ class FacturaDetalleView(DepartmentRequiredMixin, DetailView):
     template_name = "administracion/factura_detalle.html"
     context_object_name = "factura"
     queryset = FacturaRecibida.objects.select_related(
-        "proveedor", "correo", "subida_por", "duplicada_de__correo", "empresa"
+        "proveedor", "correo", "subida_por", "duplicada_de__correo", "empresa", "pago"
     )
 
     def get_context_data(self, **kwargs):
         lineas = list(self.object.lineas.all())
         suma = sum((linea.importe for linea in lineas), Decimal(0))
+        pago = self.object.pago
         return super().get_context_data(
             lineas=lineas,
             suma_lineas=suma,
+            otras_del_pago=pago.facturas.exclude(pk=self.object.pk) if pago else [],
             duplicados=self.object.duplicados.select_related("correo").order_by("recibida_en"),
             **kwargs,
         )

@@ -56,6 +56,13 @@
     <option value="ninguna" {% if empresa_actual == "ninguna" %}selected{% endif %}>Sin identificar</option>
   </select>
   {% endif %}
+  {% if filtros_pago %}
+    <label for="f-pago">Pago</label>
+    <select id="f-pago" name="pago" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for valor, nombre in filtros_pago.items %}<option value="{{ valor }}" {% if valor == pago %}selected{% endif %}>{{ nombre }}</option>{% endfor %}
+    </select>
+  {% endif %}
   {% if filtros_contabilidad %}
     <label for="f-contabilidad">Contabilidad</label>
     <select id="f-contabilidad" name="contabilidad" onchange="this.form.submit()">

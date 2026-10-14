@@ -30,6 +30,26 @@ class Empresa(models.Model):
         "Administración/ANDROMEDA SOLUTIONS/Facturas recibidas AS. Dentro van las carpetas de "
         "cada año. Vacío = no se suben a Drive.",
     )
+    # --- Conciliación de pagos (apps/administracion/conciliacion) ---
+    extracto_banco = models.CharField(
+        "extracto del banco",
+        max_length=300,
+        blank=True,
+        help_text="Hoja de cálculo en Drive con los movimientos de la cuenta, p. ej. "
+        "Administración/ANDROMEDA SOLUTIONS/Extracto anual Banco Sabadell Andromeda "
+        "Solutions.xlsx",
+    )
+    extracto_banco_pestana = models.CharField(
+        "pestaña del extracto", max_length=50, blank=True, help_text="p. ej. SABADELL"
+    )
+    extracto_tarjeta = models.CharField(
+        "extracto de la tarjeta",
+        max_length=300,
+        blank=True,
+        help_text="Hoja de cálculo en Drive con una pestaña por mes (ENE…DIC). {anio} se "
+        "sustituye por el año, p. ej. Administración/ANDROMEDA SOLUTIONS/VISA/{anio}/Tarjeta de "
+        "crédito.xlsx",
+    )
 
     class Meta:
         ordering = ["nombre"]
@@ -38,6 +58,10 @@ class Empresa(models.Model):
 
     def __str__(self) -> str:
         return self.nombre
+
+    @property
+    def concilia_pagos(self) -> bool:
+        return bool(self.extracto_banco or self.extracto_tarjeta)
 
     @property
     def nombres(self) -> list[str]:
@@ -64,6 +88,13 @@ class Proveedor(models.Model):
         choices=opciones_extractores,
         help_text="Extractor que lee las líneas y totales de sus PDF. Vacío = no se extraen.",
     )
+    textos_pago = models.TextField(
+        "textos del pago",
+        blank=True,
+        help_text="Cómo aparece el proveedor en el extracto del banco o de la tarjeta, uno por "
+        "línea (p. ej. HETZNER, PUIGSERVER Y ROMAGUERA). Sirve para conciliar sus facturas con "
+        "los pagos; sin textos solo se concilia si el importe es inequívoco.",
+    )
     notas = models.TextField(blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -75,6 +106,10 @@ class Proveedor(models.Model):
 
     def __str__(self) -> str:
         return self.nombre
+
+    @property
+    def lista_textos_pago(self) -> list[str]:
+        return [t.strip() for t in self.textos_pago.splitlines() if t.strip()]
 
     @property
     def etiqueta_completa(self) -> str:
@@ -119,6 +154,52 @@ class CorreoFactura(models.Model):
     @property
     def gmail_url(self) -> str:
         return f"https://mail.google.com/mail/u/{settings.GMAIL['MAILBOX']}/#all/{self.gmail_id}"
+
+
+class MetodoPago(models.TextChoices):
+    TARJETA = "tarjeta", "Tarjeta"
+    DOMICILIACION = "domiciliacion", "Domiciliación"
+    TRANSFERENCIA = "transferencia", "Transferencia"
+
+
+class MovimientoPago(models.Model):
+    """Un cargo o abono del extracto del banco o de la tarjeta (se importan de Drive)."""
+
+    class Origen(models.TextChoices):
+        BANCO = "banco", "Banco"
+        TARJETA = "tarjeta", "Tarjeta"
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="movimientos")
+    origen = models.CharField(max_length=10, choices=Origen.choices)
+    # Identifica el movimiento entre importaciones: origen, fecha, concepto, importe y nº de orden
+    # entre los iguales. Así las conciliaciones sobreviven a que se reordene la hoja.
+    clave = models.CharField(max_length=64)
+    fecha = models.DateField(db_index=True)
+    concepto = models.CharField(max_length=500)
+    # Positivo = sale dinero (un pago); negativo = entra (una devolución, un abono)
+    importe = models.DecimalField(max_digits=12, decimal_places=2, help_text="En euros.")
+    importe_original = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Cargos de tarjeta en otra moneda: importe en esa moneda.",
+    )
+    moneda_original = models.CharField(max_length=3, blank=True)
+    metodo = models.CharField("método", max_length=15, choices=MetodoPago.choices)
+    hoja = models.CharField(max_length=300, help_text="Fichero, pestaña y fila de origen.")
+    importado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha", "id"]
+        verbose_name = "movimiento"
+        verbose_name_plural = "movimientos (banco y tarjeta)"
+        constraints = [
+            models.UniqueConstraint(fields=["empresa", "clave"], name="movimiento_unico")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.fecha:%d/%m/%Y} {self.concepto} {self.importe} €"
 
 
 def factura_upload_to(instance: "FacturaRecibida", filename: str) -> str:
@@ -222,6 +303,26 @@ class FacturaRecibida(models.Model):
     # Contabilidad la ha movido a la carpeta CONTABILIZADO de su año
     contabilizada_en = models.DateTimeField("contabilizada", null=True, blank=True)
 
+    # --- Conciliación con los pagos (apps/administracion/conciliacion) ---
+    pago = models.ForeignKey(
+        MovimientoPago,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="facturas",
+        help_text="Cargo del banco o de la tarjeta con el que se pagó.",
+    )
+    metodo_pago = models.CharField(
+        "pagada por", max_length=15, choices=MetodoPago.choices, blank=True
+    )
+    pagada_el = models.DateField(null=True, blank=True)
+    # Marcada a mano en el admin: la conciliación automática no la toca
+    pago_manual = models.BooleanField(
+        "pago marcado a mano",
+        default=False,
+        help_text="Si está marcado, la conciliación automática respeta lo que se haya puesto.",
+    )
+
     objects = FacturaRecibidaQuerySet.as_manager()
 
     class Meta:
@@ -238,6 +339,10 @@ class FacturaRecibida(models.Model):
 
     def __str__(self) -> str:
         return f"{self.proveedor} · {self.nombre_archivo}"
+
+    @property
+    def pagada(self) -> bool:
+        return bool(self.metodo_pago)
 
     @property
     def subida_a_mano(self) -> bool:

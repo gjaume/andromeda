@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import logging
 import re
-import unicodedata
 from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
 
 from ..models import Empresa, FacturaRecibida, LineaFactura
+from ..utils import normalizar
 from .base import DatosFactura, Documento, ExtraccionError, NoEsFactura, registro
 
 logger = logging.getLogger(__name__)
@@ -52,11 +52,6 @@ def leer(factura: FacturaRecibida, doc: Documento | None = None) -> DatosFactura
     return registro[clave].extraer(doc or documento(factura))
 
 
-def _normalizar(texto: str) -> str:
-    sin_acentos = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
-    return re.sub(r"\s+", " ", sin_acentos).lower()
-
-
 def detectar_empresa(texto: str, empresas: list[Empresa]) -> Empresa | None:
     """Empresa del grupo a la que va emitida: por su CIF y, si no aparece, por su nombre.
 
@@ -66,8 +61,8 @@ def detectar_empresa(texto: str, empresas: list[Empresa]) -> Empresa | None:
     por_cif = [e for e in empresas if e.cif and e.cif.upper() in compacto]
     if por_cif:
         return por_cif[0] if len(por_cif) == 1 else None
-    normal = _normalizar(texto)
-    por_nombre = [e for e in empresas if any(_normalizar(n) in normal for n in e.nombres)]
+    normal = normalizar(texto)
+    por_nombre = [e for e in empresas if any(normalizar(n) in normal for n in e.nombres)]
     return por_nombre[0] if len(por_nombre) == 1 else None
 
 

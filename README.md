@@ -127,6 +127,24 @@ uv run python manage.py sincronizar_drive            # sube y actualiza
 
 La tarea programada no hace nada hasta que se pone `DRIVE_FACTURAS_ACTIVO=true`. El comando funciona siempre.
 
+### Conciliación con los pagos
+
+Cada factura se marca como **pagada**, indicando si fue por **tarjeta**, **domiciliación** o **transferencia**, cuando se encuentra su pago en los extractos que Administración mantiene en Drive.
+Las rutas se configuran por empresa en el admin:
+
+- **Banco:** el campo `extracto_banco` (y la pestaña) apunta a una hoja con las columnas «F. Operativa», «Concepto», «F. Valor» e «Importe». En ella, las domiciliaciones y las transferencias aparecen una a una.
+- **Tarjeta:** el campo `extracto_tarjeta`, con `{anio}`, apunta a un fichero por año con una pestaña por mes (ENE…DIC). La línea «TARJETA CREDITO…» del banco es la liquidación mensual de la tarjeta y se ignora.
+
+Los dos se leen cada hora (tarea «Conciliar pagos») o con `uv run python manage.py conciliar_pagos [--pendientes]`.
+Una factura casa con un movimiento si:
+
+- **Importe:** coincide al céntimo. Para los cargos de tarjeta en dólares se usa el «Importe original».
+- **Proveedor:** el concepto contiene alguno de los **textos del pago** del proveedor, que se editan en su ficha (por ejemplo `PUIGSERVER` para PYR Asesores). Sin textos, solo se acepta un movimiento con ese importe que sea único y esté cerca de la fecha.
+- **Fecha:** el pago está entre 60 días antes y 90 después de la factura. Si hay varias candidatas, gana la más cercana.
+
+Una transferencia que paga varias facturas seguidas del mismo proveedor, como varios meses de alquiler, también se reconoce.
+Los pagos se pueden corregir a mano en el admin marcando «pago marcado a mano»; la conciliación automática no toca esas facturas.
+
 ## Despliegue en Render
 
 `render.yaml` define un Blueprint con web service, worker y Postgres gestionado en Frankfurt:

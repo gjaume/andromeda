@@ -4,7 +4,14 @@ from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import display
 
-from .models import CorreoFactura, Empresa, FacturaRecibida, LineaFactura, Proveedor
+from .models import (
+    CorreoFactura,
+    Empresa,
+    FacturaRecibida,
+    LineaFactura,
+    MovimientoPago,
+    Proveedor,
+)
 
 
 @admin.register(Empresa)
@@ -13,9 +20,21 @@ class EmpresaAdmin(ModelAdmin):
     search_fields = ("nombre", "cif")
 
 
+@admin.register(MovimientoPago)
+class MovimientoPagoAdmin(ModelAdmin):
+    list_display = ("fecha", "concepto", "importe", "importe_original", "metodo", "empresa")
+    list_filter = ("empresa", "origen", "metodo")
+    search_fields = ("concepto",)
+    readonly_fields = [f.name for f in MovimientoPago._meta.fields]
+    date_hierarchy = "fecha"
+
+    def has_add_permission(self, request):
+        return False
+
+
 @admin.register(Proveedor)
 class ProveedorAdmin(ModelAdmin):
-    list_display = ("nombre", "cif", "etiqueta_gmail", "extractor", "activo")
+    list_display = ("nombre", "cif", "etiqueta_gmail", "extractor", "textos_pago", "activo")
     list_filter = ("activo", "extractor")
     search_fields = ("nombre", "cif", "etiqueta_gmail")
 
@@ -133,6 +152,11 @@ class LineaInline(TabularInline):
         return False
 
 
+# Se pueden corregir a mano la empresa (si no se detecta en el PDF) y el pago (marcando "pago
+# marcado a mano" para que la conciliación automática no lo cambie)
+FACTURA_EDITABLES = {"empresa", "pago", "metodo_pago", "pagada_el", "pago_manual"}
+
+
 @admin.register(FacturaRecibida)
 class FacturaRecibidaAdmin(ModelAdmin):
     list_display = (
@@ -148,8 +172,12 @@ class FacturaRecibidaAdmin(ModelAdmin):
         "duplicada_de",
         "subida_a_drive_en",
         "contabilizada_en",
+        "metodo_pago",
+        "pagada_el",
     )
     list_filter = (
+        "metodo_pago",
+        "pago_manual",
         "extraccion_estado",
         "empresa",
         DuplicadaFilter,
@@ -160,11 +188,11 @@ class FacturaRecibidaAdmin(ModelAdmin):
         "proveedor",
     )
     search_fields = ("nombre_archivo", "numero_factura", "correo__asunto")
-    # La empresa se puede corregir a mano si no se detecta en el PDF
     readonly_fields = [
         abrir_archivo,
-        *(f.name for f in FacturaRecibida._meta.fields if f.name != "empresa"),
+        *(f.name for f in FacturaRecibida._meta.fields if f.name not in FACTURA_EDITABLES),
     ]
+    raw_id_fields = ("pago",)
     inlines = [LineaInline]
     actions = ["volver_a_extraer"]
 

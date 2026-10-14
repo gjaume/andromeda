@@ -175,6 +175,7 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .checks { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
 .check { display: inline-block; padding: 0 0.45em; font-size: 0.75rem; border-radius: 3px; border: 1px solid var(--line); color: var(--rope); text-decoration: none; }
 .check.is-done { background: #D6EBDF; border-color: #D6EBDF; color: var(--ok); font-weight: 700; }
+.check.is-pending { border-color: #F0C46C; color: #8A5A00; background: #FFF6E0; }
 a.check:hover { text-decoration: underline; }
 .is-duplicate td { color: var(--rope); }
 .msg-warning { border-left-color: var(--signal); }

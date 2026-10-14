@@ -29,6 +29,10 @@
     <dt>Recibida</dt><dd>{{ factura.recibida_en|date:"d/m/Y H:i" }}</dd>
     <dt>Correo</dt><dd><a href="{{ factura.correo.gmail_url }}" target="_blank" rel="noopener">{{ factura.correo.asunto|default:"(sin asunto)" }}</a></dd>
     <dt>Fichero</dt><dd>{{ factura.nombre_archivo }}{% if factura.subida_a_mano %} <span class="tag">subida a mano</span>{% endif %}</dd>
+    <dt>Pago</dt><dd>{% include "administracion/_pago.html" %}{% if factura.pagada_el %} <span class="muted small">el {{ factura.pagada_el|date:"d/m/Y" }}</span>{% endif %}
+      {% if factura.pago %}<br><span class="small">{{ factura.pago.get_origen_display }}: {{ factura.pago.concepto }} · {{ factura.pago.importe|dinero:"EUR" }}{% if factura.pago.importe_original %} ({{ factura.pago.importe_original|dinero:factura.pago.moneda_original }}){% endif %}</span><br><span class="muted small">{{ factura.pago.hoja }}</span>{% endif %}
+      {% if otras_del_pago %}<br><span class="small">El mismo pago cubre también: {% for o in otras_del_pago %}<a href="{% url 'administracion:factura_detalle' o.pk %}">{{ o.numero_factura|default:o.nombre_archivo }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+    </dd>
     <dt>Contabilidad</dt><dd>{% include "administracion/_contabilidad.html" %}</dd>
     <dt>Extracción</dt><dd>{% include "administracion/_estado_extraccion.html" %}{% if factura.extraida_en %} <span class="muted small">{{ factura.extraida_en|date:"d/m/Y H:i" }}</span>{% endif %}</dd>
   </dl>

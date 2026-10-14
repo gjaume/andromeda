@@ -39,3 +39,18 @@ def sincronizar_facturas_drive(forzar: bool = False) -> str:
     for aviso in resumen.fuera_de_sitio + resumen.sin_empresa:
         logger.warning("Drive: %s", aviso)
     return str(resumen)
+
+
+def conciliar_pagos_drive() -> str:
+    """Programada cada hora: importa los extractos del banco y la tarjeta y concilia los pagos."""
+    from integrations import drive
+
+    from .conciliacion.servicio import conciliar_pagos
+
+    if not drive.is_configured():
+        logger.warning("Drive no está configurado: no se concilian pagos")
+        return "Drive no configurado"
+    resumen = conciliar_pagos()
+    for aviso in resumen.avisos:
+        logger.warning("Conciliación: %s", aviso)
+    return str(resumen)
