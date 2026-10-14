@@ -48,6 +48,18 @@ class IndexView(DepartmentRequiredMixin, TemplateView):
 # --- Facturas recibidas ---------------------------------------------------------------------
 
 
+CRITERIOS_FECHA = {
+    "factura": "Fecha de la factura",
+    "correo": "Fecha del correo",
+}
+
+
+def criterio_fecha(request) -> str:
+    """?fecha=factura|correo; por defecto la de la factura (o la del correo si no se tiene)."""
+    criterio = request.GET.get("fecha", "")
+    return criterio if criterio in CRITERIOS_FECHA else "factura"
+
+
 class FacturasMixin(DepartmentRequiredMixin):
     """Filtro por proveedor y cabecera común de las pestañas de facturas."""
 
@@ -86,17 +98,22 @@ class FacturaListView(FacturasMixin, ListView):
         facturas = FacturaRecibida.objects.select_related(
             "proveedor", "correo", "subida_por", "duplicada_de"
         )
-        # ?mes=AAAA-MM, al pulsar una casilla de la vista por meses
+        # ?mes=AAAA-MM[&fecha=correo], al pulsar una casilla de la vista por meses
         self.mes = None
+        self.criterio_fecha = criterio_fecha(self.request)
         if match := re.fullmatch(r"(\d{4})-(\d{2})", self.request.GET.get("mes", "")):
             anio, mes = int(match[1]), int(match[2])
             if 1 <= mes <= 12:
                 self.mes = date(anio, mes, 1)
-                facturas = facturas.filter(recibida_en__year=anio, recibida_en__month=mes)
+                facturas = facturas.con_fecha(self.criterio_fecha).filter(
+                    fecha__year=anio, fecha__month=mes
+                )
         return self.filtrar(facturas)
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(mes_actual=self.mes, **kwargs)
+        return super().get_context_data(
+            mes_actual=self.mes, criterio_fecha=self.criterio_fecha, **kwargs
+        )
 
 
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
@@ -142,7 +159,9 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         hoy = timezone.localdate()
-        anios = {d.year for d in FacturaRecibida.objects.datetimes("recibida_en", "year")}
+        criterio = criterio_fecha(self.request)
+        facturas = FacturaRecibida.objects.con_fecha(criterio)
+        anios = {d.year for d in facturas.dates("fecha", "year")}
         anios.add(hoy.year)
         anio_param = self.request.GET.get("anio", "")
         anio = int(anio_param) if anio_param.isdigit() and int(anio_param) in anios else hoy.year
@@ -152,19 +171,18 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
 
         celdas: dict[tuple[int, int], Importes] = {}
         for fila in (
-            FacturaRecibida.objects.sin_duplicados()
-            .filter(recibida_en__year=anio)
+            facturas.sin_duplicados()
+            .filter(fecha__year=anio)
             .exclude(tipo=FacturaRecibida.Tipo.RECIBO)
-            .annotate(mes=ExtractMonth("recibida_en"))
+            .annotate(mes=ExtractMonth("fecha"))
             .values_list("proveedor_id", "mes", "moneda", campo)
         ):
             proveedor_id, mes, moneda, valor = fila
             celdas.setdefault((proveedor_id, mes), Importes()).sumar(moneda, valor)
 
         # Proveedores activos, más los inactivos que tuvieron facturas ese año
-        proveedores = Proveedor.objects.filter(
-            Q(activo=True) | Q(facturas__recibida_en__year=anio)
-        ).distinct()
+        con_facturas = facturas.filter(fecha__year=anio).values("proveedor_id")
+        proveedores = Proveedor.objects.filter(Q(activo=True) | Q(pk__in=con_facturas))
         total_meses = [Importes() for _ in range(12)]
         total_anio = Importes()
         filas = []
@@ -191,6 +209,8 @@ class FacturasPorMesView(FacturasMixin, TemplateView):
             anios=sorted(anios, reverse=True),
             importe=importe,
             importes=self.IMPORTES,
+            criterio_fecha=criterio,
+            criterios_fecha=CRITERIOS_FECHA,
             meses=MESES,
             mes_en_curso=hoy.month if anio == hoy.year else None,
             filas=filas,

@@ -2,6 +2,7 @@ from pathlib import PurePath
 
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Coalesce, TruncDate
 from django.utils.text import slugify
 
 
@@ -98,6 +99,17 @@ def factura_upload_to(instance: "FacturaRecibida", filename: str) -> str:
 class FacturaRecibidaQuerySet(models.QuerySet):
     def sin_duplicados(self):
         return self.filter(duplicada_de__isnull=True)
+
+    def con_fecha(self, criterio: str = "factura"):
+        """Anota `fecha`, la que manda en la vista por meses según el criterio:
+
+        - "factura": la fecha de emisión leída del PDF y, si aún no se tiene, la del correo.
+        - "correo": el día en que llegó el correo (hora de Madrid).
+        """
+        del_correo = TruncDate("recibida_en")
+        return self.annotate(
+            fecha=del_correo if criterio == "correo" else Coalesce("fecha_factura", del_correo)
+        )
 
 
 class FacturaRecibida(models.Model):
