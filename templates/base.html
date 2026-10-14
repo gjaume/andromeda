@@ -1,0 +1,49 @@
+{% load static %}<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Inicio{% endblock %} · AndroNautic Interno</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.3/htmx.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' x-data="{ navOpen: false }">
+  <aside class="sidebar" :class="{ 'is-open': navOpen }">
+    <a class="brand" href="{% url 'core:home' %}">AndroNautic<span>Interno</span></a>
+    <nav aria-label="Herramientas">
+      {% for dept in nav_departments %}
+        <section class="nav-group">
+          <h2>{{ dept.label }}</h2>
+          <ul>
+            {% for tool in dept.tools %}
+              {% url tool.url_name as tool_url %}
+              <li><a href="{{ tool_url }}" {% if request.path == tool_url %}aria-current="page"{% endif %}>{{ tool.label }}</a></li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% empty %}
+        <p class="nav-empty">Todavía no tienes ningún departamento asignado.</p>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">
+      <span class="who">{{ request.user.get_full_name|default:request.user.email }}</span>
+      {% if request.user.is_staff %}<a href="{% url 'admin:index' %}">Administración del sistema</a>{% endif %}
+      <form method="post" action="{% url 'account_logout' %}">{% csrf_token %}<button type="submit" class="link-button">Cerrar sesión</button></form>
+    </div>
+  </aside>
+
+  <div class="main">
+    <button class="nav-toggle" type="button" @click="navOpen = !navOpen" :aria-expanded="navOpen">Menú</button>
+    {% if messages %}
+      <div class="messages" role="status">
+        {% for message in messages %}<p class="msg msg-{{ message.tags }}">{{ message }}</p>{% endfor %}
+      </div>
+    {% endif %}
+    <main>{% block content %}{% endblock %}</main>
+  </div>
+</body>
+</html>

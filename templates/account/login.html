@@ -1,0 +1,24 @@
+{% load static socialaccount %}<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar · AndroNautic Interno</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="login-page">
+  <main class="login">
+    <p class="brand">AndroNautic<span>Interno</span></p>
+    <h1>Herramientas internas del equipo</h1>
+    {% if messages %}{% for message in messages %}<p class="msg msg-{{ message.tags }}">{{ message }}</p>{% endfor %}{% endif %}
+    <form method="post" action="{% provider_login_url 'google' %}{% if redirect_field_value %}?next={{ redirect_field_value|urlencode }}{% endif %}">
+      {% csrf_token %}
+      <button type="submit" class="button-primary">Entrar con Google</button>
+    </form>
+    <p class="hint">Usa tu cuenta corporativa de AndroNautic.</p>
+  </main>
+</body>
+</html>

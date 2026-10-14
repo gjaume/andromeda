@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Inicio{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>Hola, {{ request.user.first_name|default:"equipo" }}</h1>
+  <p class="lede">Estas son las herramientas de tus departamentos.</p>
+</header>
+
+{% for dept in nav_departments %}
+  <section class="tool-list">
+    <h2>{{ dept.label }}</h2>
+    <ul>
+      {% for tool in dept.tools %}
+        <li>
+          <a href="{% url tool.url_name %}">{{ tool.label }}</a>
+          {% if tool.description %}<p>{{ tool.description }}</p>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% empty %}
+  <section class="empty-state">
+    <h2>Sin departamento asignado</h2>
+    <p>Pide a un administrador que te añada a Comercial, Administración o Marketing para ver sus herramientas.</p>
+  </section>
+{% endfor %}
+{% endblock %}
