@@ -13,6 +13,12 @@ def test_anonymous_is_redirected_to_login(client, db):
     assert response.url.startswith(reverse("account_login"))
 
 
+def test_anonymous_admin_is_redirected_to_admin_login(client, db):
+    response = client.get("/admin/")
+    assert response.status_code == 302
+    assert response.url.startswith(reverse("admin:login"))
+
+
 def test_login_page_is_public(client, db):
     response = client.get(reverse("account_login"))
     assert response.status_code == 200

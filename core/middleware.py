@@ -13,5 +13,7 @@ class LoginRequiredMiddleware:
 
     def __call__(self, request):
         if not request.user.is_authenticated and not request.path.startswith(PUBLIC_PREFIXES):
-            return redirect_to_login(request.get_full_path(), resolve_url(settings.LOGIN_URL))
+            # El admin tiene su propio login con contraseña para superusuarios.
+            login_url = "admin:login" if request.path.startswith("/admin/") else settings.LOGIN_URL
+            return redirect_to_login(request.get_full_path(), resolve_url(login_url))
         return self.get_response(request)
