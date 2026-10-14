@@ -23,6 +23,19 @@ def abrir_archivo(factura: FacturaRecibida) -> str:
     )
 
 
+class ConFacturaFilter(admin.SimpleListFilter):
+    title = "factura adjunta"
+    parameter_name = "con_factura"
+
+    def lookups(self, request, model_admin):
+        return [("si", "Con factura"), ("no", "Sin factura")]
+
+    def queryset(self, request, queryset):
+        if self.value() in ("si", "no"):
+            return queryset.filter(facturas__isnull=self.value() == "no").distinct()
+        return queryset
+
+
 class FacturaInline(TabularInline):
     model = FacturaRecibida
     fields = (abrir_archivo, "tamano")
@@ -34,7 +47,7 @@ class FacturaInline(TabularInline):
 @admin.register(CorreoFactura)
 class CorreoFacturaAdmin(ModelAdmin):
     list_display = ("recibido_en", "proveedor", "asunto", "remitente", "procesado_en")
-    list_filter = ("proveedor",)
+    list_filter = (ConFacturaFilter, "proveedor")
     search_fields = ("asunto", "remitente", "gmail_id")
     readonly_fields = [f.name for f in CorreoFactura._meta.fields]
     inlines = [FacturaInline]

@@ -258,3 +258,16 @@ def test_el_admin_enlaza_cada_adjunto(client, make_user, api, gmail, proveedor):
 
     html = client.get(reverse("admin:administracion_facturarecibida_changelist")).content.decode()
     assert reverse("administracion:factura_archivo", args=[factura.pk]) in html
+
+
+def test_el_admin_filtra_correos_sin_factura(client, make_user, api, gmail, proveedor):
+    api.get("/messages").respond(json={"messages": [{"id": "m2"}, {"id": "m1"}]})
+    api.get("/messages/m1").respond(json=mensaje("m1", asunto="Aviso sin PDF"))
+    api.get("/messages/m2").respond(json=mensaje("m2", adjuntos=[adjunto("1", "f.pdf")]))
+    sincronizar_facturas(client=gmail)
+    client.force_login(make_user(is_superuser=True, is_staff=True))
+
+    url = reverse("admin:administracion_correofactura_changelist")
+    html = client.get(f"{url}?con_factura=no").content.decode()
+    assert "Aviso sin PDF" in html
+    assert "Factura octubre" not in html
