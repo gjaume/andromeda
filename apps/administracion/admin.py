@@ -6,10 +6,12 @@ from unfold.decorators import display
 
 from .models import (
     CorreoFactura,
+    CorreoNomina,
     Empresa,
     FacturaRecibida,
     LineaFactura,
     MovimientoPago,
+    Nomina,
     Proveedor,
 )
 
@@ -208,3 +210,55 @@ class FacturaRecibidaAdmin(ModelAdmin):
             estado = extraer_datos(factura).get_extraccion_estado_display()
             estados[estado] = estados.get(estado, 0) + 1
         self.message_user(request, ", ".join(f"{n} {e.lower()}" for e, n in estados.items()))
+
+
+# --- Nóminas --------------------------------------------------------------------------------
+
+
+@display(description="Nombre archivo", ordering="nombre_archivo")
+def abrir_nomina(nomina: Nomina) -> str:
+    return format_html(
+        '<a href="{}" target="_blank" rel="noopener">{}</a>',
+        reverse("administracion:nomina_archivo", args=[nomina.pk]),
+        nomina.nombre_archivo,
+    )
+
+
+class NominaInline(TabularInline):
+    model = Nomina
+    fields = ("periodo", "empresa", "tipo", abrir_nomina)
+    readonly_fields = fields
+    extra = 0
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CorreoNomina)
+class CorreoNominaAdmin(ModelAdmin):
+    list_display = ("recibido_en", "asunto", "remitente")
+    search_fields = ("asunto", "remitente", "gmail_id")
+    readonly_fields = [f.name for f in CorreoNomina._meta.fields]
+    inlines = [NominaInline]
+
+    def has_add_permission(self, request):
+        return False
+
+
+# Se pueden corregir a mano la empresa, el mes y el tipo si el nombre del PDF no los deja claros
+NOMINA_EDITABLES = {"empresa", "periodo", "tipo"}
+
+
+@admin.register(Nomina)
+class NominaAdmin(ModelAdmin):
+    list_display = ("periodo", "empresa", "tipo", abrir_nomina, "recibida_en")
+    list_filter = ("tipo", "empresa")
+    search_fields = ("nombre_archivo", "correo__asunto")
+    readonly_fields = [
+        abrir_nomina,
+        *(f.name for f in Nomina._meta.fields if f.name not in NOMINA_EDITABLES),
+    ]
+
+    def has_add_permission(self, request):
+        return False

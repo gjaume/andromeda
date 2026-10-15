@@ -181,6 +181,8 @@ GMAIL = {
     "SERVICE_ACCOUNT_JSON": env("GMAIL_SERVICE_ACCOUNT_JSON", default=""),
     # Etiqueta padre; cada proveedor tiene una subetiqueta "Gastos/<proveedor>"
     "INVOICES_LABEL": env("GMAIL_INVOICES_LABEL", default="Gastos"),
+    # Etiqueta de los correos de la gestoría con las nóminas de cada mes
+    "NOMINAS_LABEL": env("GMAIL_NOMINAS_LABEL", default="Gastos/Nominas"),
     # Ventana de búsqueda de cada sincronización programada
     "SYNC_DAYS": env.int("GMAIL_SYNC_DAYS", default=30),
 }

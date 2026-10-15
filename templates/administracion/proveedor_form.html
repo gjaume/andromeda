@@ -30,6 +30,9 @@
   <div class="form-actions">
     <button type="submit" class="button">Guardar</button>
     <a href="{% url 'administracion:proveedores' %}">Cancelar</a>
+    {% if object %}
+      <a class="form-actions-end link-danger" href="{% url 'administracion:proveedor_eliminar' object.pk %}">Eliminar proveedor</a>
+    {% endif %}
   </div>
 </form>
 {% endblock %}

@@ -132,6 +132,10 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .button:disabled { background: var(--rope); cursor: not-allowed; }
 .button-secondary { color: var(--harbour); background: var(--paper); border: 1px solid var(--line); }
 .button-secondary:hover { border-color: var(--harbour-soft); }
+.button-danger { color: #fff; background: var(--danger); }
+.button-danger:hover { background: #8C1D17; }
+.link-danger { color: var(--danger); }
+.form-actions-end { margin-left: auto; }
 .button-small { padding: 0.3rem 0.7rem; font-size: 0.875rem; }
 .row-actions { white-space: nowrap; }
 .row-actions form { display: block; margin-top: 0.35rem; text-align: center; }

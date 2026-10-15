@@ -21,6 +21,7 @@ GMAIL = {
     "MAILBOX": "admin@andronautic.com",
     "SERVICE_ACCOUNT_JSON": "",
     "INVOICES_LABEL": "Gastos",
+    "NOMINAS_LABEL": "Gastos/Nominas",
     "SYNC_DAYS": 30,
 }
 Q_CLUSTER = {"name": "test", "orm": "default", "sync": True, "timeout": 60, "retry": 120}

@@ -32,7 +32,19 @@ urlpatterns = [
     path("facturas/<int:pk>/", views.FacturaDetalleView.as_view(), name="factura_detalle"),
     path("facturas/<int:pk>/extraer/", views.FacturaExtraerView.as_view(), name="factura_extraer"),
     path("facturas/<int:pk>/archivo/", views.FacturaArchivoView.as_view(), name="factura_archivo"),
+    path("nominas/", views.NominaListView.as_view(), name="nominas"),
+    path(
+        "nominas/sincronizar/",
+        views.SincronizarNominasView.as_view(),
+        name="nominas_sincronizar",
+    ),
+    path("nominas/<int:pk>/archivo/", views.NominaArchivoView.as_view(), name="nomina_archivo"),
     path("proveedores/", views.ProveedorListView.as_view(), name="proveedores"),
     path("proveedores/nuevo/", views.ProveedorCreateView.as_view(), name="proveedor_nuevo"),
     path("proveedores/<int:pk>/", views.ProveedorUpdateView.as_view(), name="proveedor_editar"),
+    path(
+        "proveedores/<int:pk>/eliminar/",
+        views.ProveedorDeleteView.as_view(),
+        name="proveedor_eliminar",
+    ),
 ]

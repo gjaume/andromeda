@@ -54,3 +54,13 @@ def conciliar_pagos_drive() -> str:
     for aviso in resumen.avisos:
         logger.warning("Conciliación: %s", aviso)
     return str(resumen)
+
+
+def sincronizar_nominas_gmail(dias: int | None = None) -> str:
+    """Programada cada pocas horas (Django Q → Tareas programadas) y lanzable a mano."""
+    from .nominas import sincronizar_nominas
+
+    if not gmail.is_configured():
+        logger.warning("Gmail no está configurado: no se buscan nóminas")
+        return "Gmail no configurado"
+    return str(sincronizar_nominas(dias))

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Eliminar {{ object.nombre }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <p class="crumb"><a href="{% url 'administracion:proveedor_editar' object.pk %}">← {{ object.nombre }}</a></p>
+  <h1>Eliminar {{ object.nombre }}</h1>
+</header>
+
+<form method="post" class="form">
+  {% csrf_token %}
+  {% if num_correos %}
+    <p>Se eliminarán también sus <strong>{{ num_facturas }} factura{{ num_facturas|pluralize }}</strong> y {{ num_correos }} correo{{ num_correos|pluralize }} procesado{{ num_correos|pluralize }}, con los PDF guardados.</p>
+    {% if num_en_drive %}
+      <p>{{ num_en_drive }} de esas facturas están en Drive{% if num_contabilizadas %} ({{ num_contabilizadas }} contabilizada{{ num_contabilizadas|pluralize }}){% endif %}. Los ficheros de Drive no se borran.</p>
+    {% endif %}
+    <p class="help">Los correos siguen en Gmail, en la etiqueta <code>{{ object.etiqueta_completa }}</code>. Si vuelves a crear el proveedor, sus facturas se pueden volver a descargar.</p>
+    <p>Si solo quieres dejar de buscar sus facturas, <a href="{% url 'administracion:proveedor_editar' object.pk %}">desmárcalo como activo</a>.</p>
+  {% else %}
+    <p>Este proveedor no tiene correos ni facturas.</p>
+  {% endif %}
+  <div class="form-actions">
+    <button type="submit" class="button button-danger">Eliminar proveedor</button>
+    <a href="{% url 'administracion:proveedor_editar' object.pk %}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

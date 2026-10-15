@@ -47,17 +47,21 @@ def es_factura(nombre_archivo: str) -> bool:
     return PurePath(nombre_archivo).suffix.lower() in EXTENSIONES_FACTURA
 
 
+def consulta_gmail(dias: int | None = None, desde: date | None = None) -> str:
+    """Filtro de búsqueda de Gmail: desde una fecha o los últimos `dias` días (0 = todo)."""
+    if desde:
+        # Marca de tiempo exacta: con "after:AAAA/MM/DD" Gmail usa la hora del Pacífico
+        inicio = timezone.make_aware(datetime.combine(desde, time.min))
+        return f"after:{int(inicio.timestamp())}"
+    dias = settings.GMAIL["SYNC_DAYS"] if dias is None else dias
+    return f"newer_than:{dias}d" if dias else ""
+
+
 def sincronizar_facturas(
     dias: int | None = None, *, desde: date | None = None, client: GmailClient | None = None
 ) -> ResultadoSincronizacion:
     """Busca facturas nuevas desde la fecha `desde`, o de los últimos `dias` días (0 = todas)."""
-    if desde:
-        # Marca de tiempo exacta: con "after:AAAA/MM/DD" Gmail usa la hora del Pacífico
-        inicio = timezone.make_aware(datetime.combine(desde, time.min))
-        query = f"after:{int(inicio.timestamp())}"
-    else:
-        dias = settings.GMAIL["SYNC_DAYS"] if dias is None else dias
-        query = f"newer_than:{dias}d" if dias else ""
+    query = consulta_gmail(dias, desde)
     resultado = ResultadoSincronizacion()
 
     gmail = client or get_client()

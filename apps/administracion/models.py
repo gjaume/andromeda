@@ -376,3 +376,72 @@ class LineaFactura(models.Model):
 
     def __str__(self) -> str:
         return self.descripcion[:80]
+
+
+# --- Nóminas --------------------------------------------------------------------------------
+
+
+class CorreoNomina(models.Model):
+    """Correo de la etiqueta de nóminas ya revisado, para no volver a descargarlo."""
+
+    gmail_id = models.CharField(max_length=64, unique=True)
+    asunto = models.CharField(max_length=500, blank=True)
+    remitente = models.CharField(max_length=320, blank=True)
+    recibido_en = models.DateTimeField(db_index=True)
+    procesado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-recibido_en"]
+        verbose_name = "correo de nóminas"
+        verbose_name_plural = "correos de nóminas"
+
+    def __str__(self) -> str:
+        return self.asunto or self.gmail_id
+
+    @property
+    def gmail_url(self) -> str:
+        return f"https://mail.google.com/mail/u/{settings.GMAIL['MAILBOX']}/#all/{self.gmail_id}"
+
+
+def nomina_upload_to(instance: "Nomina", filename: str) -> str:
+    nombre = PurePath(filename)
+    limpio = f"{slugify(nombre.stem)[:80] or 'nominas'}{nombre.suffix.lower()}"
+    empresa = slugify(instance.empresa.nombre) if instance.empresa else "sin-empresa"
+    return f"nominas/{empresa}/{instance.periodo:%Y/%m}/{limpio}"
+
+
+class Nomina(models.Model):
+    """PDF de nóminas de un mes: el de todos los empleados, el resumen o, si el correo no trae
+    el de todos, el de cada empleado."""
+
+    class Tipo(models.TextChoices):
+        NOMINAS = "nominas", "Nóminas"
+        RESUMEN = "resumen", "Resumen"
+        EMPLEADO = "empleado", "Nómina de un empleado"
+
+    correo = models.ForeignKey(CorreoNomina, on_delete=models.CASCADE, related_name="nominas")
+    empresa = models.ForeignKey(
+        Empresa, null=True, blank=True, on_delete=models.PROTECT, related_name="nominas"
+    )
+    periodo = models.DateField(help_text="Mes de las nóminas (día 1).")
+    tipo = models.CharField(max_length=10, choices=Tipo.choices)
+    gmail_part_id = models.CharField(max_length=32, blank=True)
+    nombre_archivo = models.CharField(max_length=255)
+    archivo = models.FileField(upload_to=nomina_upload_to, max_length=300)
+    tamano = models.PositiveIntegerField("tamaño", default=0)
+    recibida_en = models.DateTimeField(db_index=True)
+
+    class Meta:
+        ordering = ["-periodo", "tipo", "-recibida_en"]
+        verbose_name = "nómina"
+        verbose_name_plural = "nóminas"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["correo", "gmail_part_id"],
+                condition=~models.Q(gmail_part_id=""),
+                name="nomina_unica_por_adjunto",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.nombre_archivo

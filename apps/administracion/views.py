@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Count, Q
 from django.db.models.functions import ExtractMonth
 from django.http import FileResponse
@@ -18,6 +19,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import (
     CreateView,
+    DeleteView,
     DetailView,
     FormView,
     ListView,
@@ -35,12 +37,13 @@ from .drive import facturas_a_subir
 from .extraccion.servicio import extraer_datos
 from .facturas import subir_facturas
 from .forms import ProveedorForm, SubirFacturasForm
-from .models import CorreoFactura, Empresa, FacturaRecibida, MetodoPago, Proveedor
+from .models import CorreoFactura, Empresa, FacturaRecibida, MetodoPago, Nomina, Proveedor
 
 logger = logging.getLogger(__name__)
 
 TAREA_SINCRONIZAR = "apps.administracion.tasks.sincronizar_facturas_gmail"
 TAREA_DRIVE = "apps.administracion.tasks.sincronizar_facturas_drive"
+TAREA_NOMINAS = "apps.administracion.tasks.sincronizar_nominas_gmail"
 
 
 class IndexView(DepartmentRequiredMixin, TemplateView):
@@ -432,6 +435,73 @@ class FacturaArchivoView(DepartmentRequiredMixin, SingleObjectMixin, View):
         )
 
 
+# --- Nóminas -------------------------------------------------------------------------------
+
+
+class NominaListView(DepartmentRequiredMixin, ListView):
+    department = "administracion"
+    template_name = "administracion/nominas.html"
+    context_object_name = "nominas"
+    paginate_by = 50
+
+    def get_queryset(self):
+        nominas = Nomina.objects.select_related("correo", "empresa")
+        valor = self.request.GET.get("empresa", "")
+        self.empresa = Empresa.objects.filter(pk=valor).first() if valor.isdigit() else None
+        if self.empresa:
+            nominas = nominas.filter(empresa=self.empresa)
+        self.tipo = self.request.GET.get("tipo", "")
+        if self.tipo in Nomina.Tipo.values:
+            nominas = nominas.filter(tipo=self.tipo)
+        else:
+            self.tipo = ""
+        return nominas
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            empresas=Empresa.objects.all(),
+            empresa_actual=self.empresa,
+            tipos=Nomina.Tipo.choices,
+            tipo_actual=self.tipo,
+            etiqueta=settings.GMAIL["NOMINAS_LABEL"],
+            ultima_sincronizacion=Task.objects.filter(func=TAREA_NOMINAS)
+            .order_by("-stopped")
+            .first(),
+            gmail_configurado=gmail.is_configured(),
+            **kwargs,
+        )
+
+
+class SincronizarNominasView(DepartmentRequiredMixin, View):
+    department = "administracion"
+
+    def post(self, request):
+        if not gmail.is_configured():
+            messages.error(request, "Gmail no está configurado: falta GMAIL_SERVICE_ACCOUNT_JSON.")
+        else:
+            async_task(TAREA_NOMINAS, task_name="Sincronizar nóminas (manual)")
+            messages.success(
+                request,
+                "Buscando nóminas nuevas en Gmail. Recarga la página en un minuto para verlas.",
+            )
+        return redirect("administracion:nominas")
+
+
+class NominaArchivoView(DepartmentRequiredMixin, SingleObjectMixin, View):
+    """Sirve el PDF a través de la app para que solo lo vea el departamento."""
+
+    department = "administracion"
+    model = Nomina
+
+    def get(self, request, *args, **kwargs):
+        nomina = self.get_object()
+        return FileResponse(
+            nomina.archivo.open("rb"),
+            filename=nomina.nombre_archivo,
+            content_type="application/pdf",
+        )
+
+
 # --- Proveedores ----------------------------------------------------------------------------
 
 
@@ -465,6 +535,46 @@ class ProveedorUpdateView(ProveedorFormMixin, UpdateView):
     success_message = "Proveedor %(nombre)s guardado."
 
 
+class ProveedorDeleteView(DepartmentRequiredMixin, DeleteView):
+    """Borra el proveedor con sus correos y facturas (y los PDF guardados).
+
+    No toca Gmail ni Drive: los correos siguen en su etiqueta y las copias de contabilidad, en
+    su carpeta. Si se vuelve a crear el proveedor, sus facturas se pueden volver a descargar.
+    """
+
+    department = "administracion"
+    model = Proveedor
+    template_name = "administracion/proveedor_borrar.html"
+    success_url = reverse_lazy("administracion:proveedores")
+
+    def get_context_data(self, **kwargs):
+        facturas = self.object.facturas.all()
+        return super().get_context_data(
+            num_correos=self.object.correos.count(),
+            num_facturas=facturas.count(),
+            num_en_drive=facturas.exclude(drive_id="").count(),
+            num_contabilizadas=facturas.filter(contabilizada_en__isnull=False).count(),
+            **kwargs,
+        )
+
+    def form_valid(self, form):
+        proveedor = self.object
+        archivos = [(f.archivo.storage, f.archivo.name) for f in proveedor.facturas.all()]
+        with transaction.atomic():
+            # Las facturas y los correos protegen al proveedor: se borran antes, a propósito
+            proveedor.facturas.all().delete()
+            proveedor.correos.all().delete()
+            proveedor.delete()
+        for storage, nombre in archivos:
+            if nombre:
+                try:
+                    storage.delete(nombre)
+                except OSError:
+                    logger.warning("No se pudo borrar el PDF %s", nombre, exc_info=True)
+        messages.success(self.request, f"Proveedor {proveedor.nombre} eliminado.")
+        return redirect(self.success_url)
+
+
 def etiquetas_de_gastos() -> list[str]:
     """Subetiquetas de "Gastos" en Gmail, para sugerirlas en el formulario de proveedor."""
     if not gmail.is_configured():
@@ -479,4 +589,5 @@ def etiquetas_de_gastos() -> list[str]:
             logger.exception("No se pudieron leer las etiquetas de Gmail")
             return []
         cache.set("gmail:etiquetas", etiquetas, 600)
-    return [e[len(padre) :] for e in etiquetas if e.startswith(padre)]
+    nominas = settings.GMAIL["NOMINAS_LABEL"]  # no es de un proveedor
+    return [e[len(padre) :] for e in etiquetas if e.startswith(padre) and e != nominas]

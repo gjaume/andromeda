@@ -457,3 +457,37 @@ def test_filtro_por_mes_en_el_listado(administracion, proveedor):
     assert "abril.pdf" not in html
     assert "Marzo 2025" in html
     assert administracion.get(url, {"mes": "2025-13"}).status_code == 200
+
+
+def test_eliminar_un_proveedor_borra_sus_correos_facturas_y_pdf(administracion, proveedor):
+    from django.core.files.base import ContentFile
+    from django.utils import timezone
+
+    correo = CorreoFactura.objects.create(
+        proveedor=proveedor, gmail_id="m1", recibido_en=timezone.now()
+    )
+    factura = FacturaRecibida(
+        proveedor=proveedor, correo=correo, gmail_part_id="1", nombre_archivo="f.pdf",
+        recibida_en=correo.recibido_en,
+    )  # fmt: skip
+    factura.archivo.save("f.pdf", ContentFile(PDF), save=False)
+    factura.save()
+    storage, nombre = factura.archivo.storage, factura.archivo.name
+    otro = Proveedor.objects.create(nombre="Otro", etiqueta_gmail="Otro")
+    url = reverse("administracion:proveedor_eliminar", args=[proveedor.pk])
+
+    html = administracion.get(url).content.decode()
+    assert "1 factura" in html and "1 correo" in html
+    respuesta = administracion.post(url)
+
+    assert respuesta.status_code == 302
+    assert list(Proveedor.objects.all()) == [otro]
+    assert not CorreoFactura.objects.exists() and not FacturaRecibida.objects.exists()
+    assert not storage.exists(nombre)
+
+
+def test_solo_administracion_puede_eliminar_proveedores(client, make_user, proveedor):
+    client.force_login(make_user(departments=["Comercial"]))
+    url = reverse("administracion:proveedor_eliminar", args=[proveedor.pk])
+    assert client.post(url).status_code == 403
+    assert Proveedor.objects.filter(pk=proveedor.pk).exists()

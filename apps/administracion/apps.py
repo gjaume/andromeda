@@ -30,6 +30,14 @@ class AdministracionConfig(AppConfig):
         register_tool(
             "administracion",
             Tool(
+                label="Nóminas",
+                url_name="administracion:nominas",
+                description="Nóminas que manda la gestoría, descargadas desde Gmail.",
+            ),
+        )
+        register_tool(
+            "administracion",
+            Tool(
                 label="Proveedores",
                 url_name="administracion:proveedores",
                 description="Proveedores y la etiqueta de Gmail donde llegan sus facturas.",

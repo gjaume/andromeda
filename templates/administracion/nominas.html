@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Nóminas{% endblock %}
+{% block content %}
+<header class="page-head page-head-actions">
+  <div>
+    <h1>Nóminas</h1>
+    <p class="lede">
+      Se descargan solas desde Gmail cada pocas horas, de la etiqueta <code>{{ etiqueta }}</code>:
+      el PDF con las nóminas de todos los empleados y el resumen de cada mes.
+      {% if ultima_sincronizacion %}
+        Última búsqueda: {{ ultima_sincronizacion.stopped|date:"j M Y, H:i" }}{% if not ultima_sincronizacion.success %} <strong class="text-danger">(falló)</strong>{% endif %}.
+      {% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    <form method="post" action="{% url 'administracion:nominas_sincronizar' %}">
+      {% csrf_token %}
+      <button type="submit" class="button" {% if not gmail_configurado %}disabled title="Gmail no está configurado"{% endif %}>Buscar nóminas ahora</button>
+    </form>
+  </div>
+</header>
+
+{% if not gmail_configurado %}
+  <p class="msg msg-error">Gmail no está configurado todavía (falta <code>GMAIL_SERVICE_ACCOUNT_JSON</code>), así que no se descargarán nóminas.</p>
+{% endif %}
+
+<form method="get" class="filters">
+  {% if empresas %}
+  <label for="f-empresa">Empresa</label>
+  <select id="f-empresa" name="empresa" onchange="this.form.submit()">
+    <option value="">Todas</option>
+    {% for e in empresas %}<option value="{{ e.pk }}" {% if e == empresa_actual %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <label for="f-tipo">Documento</label>
+  <select id="f-tipo" name="tipo" onchange="this.form.submit()">
+    <option value="">Todos</option>
+    {% for valor, nombre in tipos %}<option value="{{ valor }}" {% if valor == tipo_actual %}selected{% endif %}>{{ nombre }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit" class="button-secondary">Filtrar</button></noscript>
+</form>
+
+{% if nominas %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Mes</th><th scope="col">Empresa</th><th scope="col">Documento</th><th scope="col">Correo</th><th scope="col">Recibido</th></tr>
+      </thead>
+      <tbody>
+        {% for n in nominas %}
+          <tr>
+            <td class="nowrap">{{ n.periodo|date:"F Y"|capfirst }}</td>
+            <td>{{ n.empresa.nombre|default:"—" }}</td>
+            <td>
+              <a href="{% url 'administracion:nomina_archivo' n.pk %}" target="_blank" rel="noopener">{{ n.nombre_archivo }}</a>
+              <span class="tag{% if n.tipo != 'nominas' %} tag-muted{% endif %}">{{ n.get_tipo_display }}</span>
+            </td>
+            <td><a href="{{ n.correo.gmail_url }}" target="_blank" rel="noopener">{{ n.correo.asunto|default:"(sin asunto)" }}</a><br><span class="muted small">{{ n.correo.remitente }}</span></td>
+            <td class="nowrap">{{ n.recibida_en|date:"d/m/Y H:i" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "administracion/_paginacion.html" %}
+{% else %}
+  <section class="empty-state">
+    <h2>Todavía no hay nóminas</h2>
+    <p>Aparecerán aquí en cuanto llegue un correo con nóminas a la etiqueta <code>{{ etiqueta }}</code> de Gmail.</p>
+  </section>
+{% endif %}
+{% endblock %}
