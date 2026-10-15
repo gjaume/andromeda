@@ -30,9 +30,13 @@ class Command(BaseCommand):
                 self.stdout.write(f"  Crearía la carpeta {nombre}")
             for nombre in resumen.subidas:
                 self.stdout.write(f"  Subiría {nombre}")
+            for cambio in resumen.renombradas:
+                self.stdout.write(f"  Renombraría {cambio}")
         else:
             for nombre in resumen.subidas:
                 self.stdout.write(f"  Subida {nombre}")
+            for cambio in resumen.renombradas:
+                self.stdout.write(f"  Renombrada {cambio}")
         if resumen.fuera_de_sitio:
             self.stdout.write(
                 self.style.WARNING("Fuera de sitio (contabilidad debe moverlas a su año):")

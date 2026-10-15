@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class Ubicacion:
     drive_id: str
+    nombre: str
     ruta: str  # "2026/CONTABILIZADO/1T/fichero.pdf", relativa a la carpeta de la empresa
     anio: int | None  # carpeta de año en la que está, si está dentro de una
     contabilizada: bool  # dentro de <año>/CONTABILIZADO
@@ -59,6 +60,7 @@ class Ubicacion:
 @dataclass
 class Resumen:
     subidas: list[str] = field(default_factory=list)
+    renombradas: list[str] = field(default_factory=list)
     ya_subidas: int = 0
     contabilizadas: int = 0
     nuevas_contabilizadas: list[str] = field(default_factory=list)
@@ -73,6 +75,8 @@ class Resumen:
             f"{self.ya_subidas} ya estaban en Drive",
             f"{self.contabilizadas} contabilizadas ({len(self.nuevas_contabilizadas)} nuevas)",
         ]
+        if self.renombradas:
+            partes.append(f"{len(self.renombradas)} renombradas")
         if self.fuera_de_sitio:
             partes.append(f"{len(self.fuera_de_sitio)} fuera de sitio")
         if self.sin_empresa:
@@ -126,7 +130,7 @@ def indexar(client: DriveClient, raiz: str, contabilizado: str) -> dict[str, lis
                     es_contabilizado = es_contabilizado and f.name == contabilizado
                     pendientes.append((f.id, f"{ruta_f}/", anio, contabilizada or es_contabilizado))
             else:
-                ubicacion = Ubicacion(f.id, ruta_f, anio, contabilizada)
+                ubicacion = Ubicacion(f.id, f.name, ruta_f, anio, contabilizada)
                 indice[f.id].append(ubicacion)
                 if f.md5:
                     indice[f.md5].append(ubicacion)
@@ -215,6 +219,7 @@ def _sincronizar_factura(client, factura, indice, carpeta_del_anio, resumen, pro
         subida = client.subir(carpeta, nombre, leer_pdf(factura))
         logger.info("Factura %s subida a Drive (%s)", factura.pk, subida.id)
         factura.drive_id = subida.id
+        factura.drive_nombre = subida.name
         factura.subida_a_drive_en = ahora
         factura.contabilizada_en = None
     else:
@@ -227,9 +232,25 @@ def _sincronizar_factura(client, factura, indice, carpeta_del_anio, resumen, pro
         contabilizada = ubicacion.contabilizada and ubicacion.anio == anio
         if contabilizada and not factura.contabilizada_en:
             resumen.nuevas_contabilizadas.append(str(factura))
+        nombre = nombre_en_drive(factura)
+        # La subimos nosotros, nadie la ha tocado y su nombre ya no es el bueno (p. ej. se subió
+        # antes de leer la fecha de la factura): se corrige mientras no esté contabilizada
+        renombrar = (
+            ubicacion.anio == anio
+            and not ubicacion.contabilizada
+            and factura.drive_nombre
+            and ubicacion.nombre == factura.drive_nombre
+            and ubicacion.nombre != nombre
+        )
+        if renombrar:
+            resumen.renombradas.append(f"{ubicacion.ruta} → {nombre}")
         if probar:
             return
+        if renombrar:
+            factura.drive_nombre = client.renombrar(ubicacion.drive_id, nombre).name
         factura.drive_id = ubicacion.drive_id
         factura.subida_a_drive_en = factura.subida_a_drive_en or ahora
         factura.contabilizada_en = (factura.contabilizada_en or ahora) if contabilizada else None
-    factura.save(update_fields=["drive_id", "subida_a_drive_en", "contabilizada_en"])
+    factura.save(
+        update_fields=["drive_id", "drive_nombre", "subida_a_drive_en", "contabilizada_en"]
+    )

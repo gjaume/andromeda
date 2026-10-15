@@ -4,7 +4,8 @@ Usa la misma cuenta de servicio con delegación de dominio que Gmail, actuando e
 usuario (DRIVE_USUARIO) con acceso a la unidad compartida y el scope drive.
 
 - Las lecturas se reintentan con backoff ante timeouts, 429 y 5xx. Las escrituras (crear
-  carpeta, subir fichero) no se reintentan, para no duplicar nada si la primera llegó a hacerse.
+  carpeta, subir o renombrar fichero) no se reintentan, para no duplicar nada si la primera
+  llegó a hacerse.
 - Todas las llamadas incluyen supportsAllDrives: sin ese parámetro Drive ignora las unidades
   compartidas.
 """
@@ -173,6 +174,15 @@ class DriveClient:
             json={"name": nombre, "mimeType": CARPETA, "parents": [padre_id]},
         )
         return DriveFile(data["id"], data["name"], data["mimeType"])
+
+    def renombrar(self, fichero_id: str, nombre: str) -> DriveFile:
+        data = self._enviar(
+            "PATCH",
+            f"{API_URL}files/{fichero_id}",
+            params={"supportsAllDrives": "true", "fields": CAMPOS_FICHERO},
+            json={"name": nombre},
+        )
+        return DriveFile(data["id"], data["name"], data["mimeType"], data.get("md5Checksum", ""))
 
     def subir(
         self, padre_id: str, nombre: str, contenido: bytes, mime_type: str = "application/pdf"

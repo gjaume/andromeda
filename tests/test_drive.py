@@ -34,6 +34,7 @@ class DriveFalso:
             "Facturas recibidas", self.carpeta("ANDROMEDA TECH GROUP", self.unidad)
         )
         self.subidas: list[str] = []
+        self.renombradas: list[str] = []
 
     def carpeta(self, nombre, padre):
         return self._nuevo(nombre, padre, CARPETA)
@@ -82,6 +83,11 @@ class DriveFalso:
 
     def crear_carpeta(self, padre_id, nombre):
         return DriveFile(self.carpeta(nombre, padre_id), nombre, CARPETA)
+
+    def renombrar(self, fichero_id, nombre):
+        self.items[fichero_id]["name"] = nombre
+        self.renombradas.append(nombre)
+        return DriveFile(fichero_id, nombre, self.items[fichero_id]["mime"])
 
     def subir(self, padre_id, nombre, contenido, mime_type="application/pdf"):
         item_id = self.fichero(nombre, padre_id, contenido)
@@ -473,3 +479,42 @@ def test_la_tarea_forzada_funciona_aunque_este_desactivada(settings, crear, driv
     monkeypatch.setattr("integrations.drive.get_client", lambda: drive)
     crear()
     assert sincronizar_facturas_drive(forzar=True).startswith("1 subidas")
+
+
+def test_corrige_el_nombre_si_se_subio_antes_de_leer_la_fecha(drive, crear):
+    factura = crear(fecha_factura=None, numero="")  # aún sin extraer: fecha del correo
+    sincronizar_drive(client=drive)
+    factura.refresh_from_db()
+    assert factura.drive_nombre == "2026-04-02 Acme Invoice.pdf"
+
+    # Se extrae después: cambian la fecha y el nº
+    FacturaRecibida.objects.filter(pk=factura.pk).update(
+        fecha_factura=date(2026, 3, 31), numero_factura="F-1"
+    )
+    resumen = sincronizar_drive(client=drive)
+
+    factura.refresh_from_db()
+    assert resumen.renombradas == ["2026/2026-04-02 Acme Invoice.pdf → 2026-03-31 Acme F-1.pdf"]
+    assert drive.items[factura.drive_id]["name"] == "2026-03-31 Acme F-1.pdf"
+    assert factura.drive_nombre == "2026-03-31 Acme F-1.pdf"
+    assert len(drive.subidas) == 1
+
+
+@pytest.mark.parametrize("caso", ["renombrada_por_contabilidad", "contabilizada", "probar"])
+def test_no_renombra_lo_que_no_debe(drive, crear, caso):
+    factura = crear(fecha_factura=None, numero="")
+    sincronizar_drive(client=drive)
+    factura.refresh_from_db()
+    if caso == "renombrada_por_contabilidad":
+        drive.items[factura.drive_id]["name"] = "acme marzo.pdf"
+    elif caso == "contabilizada":
+        anio = drive.buscar("2026", drive.facturas)
+        drive.mover(factura.drive_id, drive.buscar("CONTABILIZADO", anio))
+    FacturaRecibida.objects.filter(pk=factura.pk).update(
+        fecha_factura=date(2026, 3, 31), numero_factura="F-1"
+    )
+
+    resumen = sincronizar_drive(client=drive, probar=caso == "probar")
+
+    assert drive.renombradas == []
+    assert bool(resumen.renombradas) == (caso == "probar")  # en prueba solo lo anuncia

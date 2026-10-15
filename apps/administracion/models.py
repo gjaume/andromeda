@@ -297,6 +297,9 @@ class FacturaRecibida(models.Model):
 
     # --- Copia en Google Drive para contabilidad (apps/administracion/drive.py) ---
     drive_id = models.CharField("id en Drive", max_length=100, blank=True)
+    # Nombre con el que la subimos: si sigue igual en Drive, se puede corregir (p. ej. cuando se
+    # subió antes de leer la fecha del PDF); si contabilidad lo cambió, no se toca
+    drive_nombre = models.CharField("nombre en Drive", max_length=255, blank=True)
     # MD5 del PDF: así lo identifica Drive (md5Checksum). Se calcula la primera vez que hace falta.
     md5 = models.CharField("MD5", max_length=32, blank=True)
     subida_a_drive_en = models.DateTimeField("subida a Drive", null=True, blank=True)
