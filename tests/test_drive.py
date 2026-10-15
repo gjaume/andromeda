@@ -154,7 +154,7 @@ def test_crea_la_carpeta_del_anio_y_sube_la_factura(drive, crear):
         "ANDROMEDA SOLUTIONS / 2026",
         "ANDROMEDA SOLUTIONS / 2026 / CONTABILIZADO",
     ]
-    assert drive.ruta_de(factura.drive_id) == "2026/2026-03-31 Acme F-1.pdf"
+    assert drive.ruta_de(factura.drive_id) == "2026/Acme 2026-03-31 F-1.pdf"
     assert drive.subcarpeta(drive.buscar("2026", drive.facturas), "CONTABILIZADO")
     assert factura.subida_a_drive_en is not None
     assert factura.contabilizada_en is None
@@ -169,7 +169,7 @@ def test_usa_la_carpeta_del_anio_si_existe_y_no_vuelve_a_subir(drive, crear):
     sincronizar_drive(client=drive)
     resumen = sincronizar_drive(client=drive)
 
-    assert drive.subidas == ["2026-03-31 Acme F-1.pdf"]
+    assert drive.subidas == ["Acme 2026-03-31 F-1.pdf"]
     assert (resumen.subidas, resumen.ya_subidas, resumen.carpetas_creadas) == ([], 1, [])
 
 
@@ -196,7 +196,7 @@ def test_detecta_cuando_contabilidad_la_mueve_a_contabilizado(drive, crear):
     factura.refresh_from_db()
     assert resumen.nuevas_contabilizadas == [str(factura)]
     assert factura.contabilizada_en is not None
-    assert drive.subidas == ["2026-03-31 Acme F-1.pdf"]
+    assert drive.subidas == ["Acme 2026-03-31 F-1.pdf"]
 
     # Si la devuelven a la carpeta del año, vuelve a estar pendiente
     drive.mover(factura.drive_id, anio)
@@ -218,7 +218,7 @@ def test_reconoce_por_contenido_las_que_ya_estaban_en_drive(drive, crear):
 
     for f in (ya_contabilizada, pendiente, nueva):
         f.refresh_from_db()
-    assert drive.subidas == ["2026-03-31 Acme F-3.pdf"]
+    assert drive.subidas == ["Acme 2026-03-31 F-3.pdf"]
     assert ya_contabilizada.contabilizada_en is not None
     assert pendiente.subida_a_drive_en and not pendiente.contabilizada_en
     assert nueva.subida_a_drive_en and not nueva.contabilizada_en
@@ -240,9 +240,9 @@ def test_el_anio_sale_de_la_fecha_de_la_factura_o_del_correo(drive, crear):
 
     sincronizar_drive(client=drive)
     assert sorted(drive.ruta_de(drive.buscar(n, p)) for n, p in [
-        ("2025-12-31 Acme F-1.pdf", drive.buscar("2025", drive.facturas)),
-        ("2026-04-02 Acme Invoice.pdf", drive.buscar("2026", drive.facturas)),
-    ]) == ["2025/2025-12-31 Acme F-1.pdf", "2026/2026-04-02 Acme Invoice.pdf"]  # fmt: skip
+        ("Acme 2025-12-31 F-1.pdf", drive.buscar("2025", drive.facturas)),
+        ("Acme 2026-04-02 Invoice.pdf", drive.buscar("2026", drive.facturas)),
+    ]) == ["2025/Acme 2025-12-31 F-1.pdf", "2026/Acme 2026-04-02 Invoice.pdf"]  # fmt: skip
 
 
 def test_no_sube_duplicadas_recibos_ni_anexos(drive, crear):
@@ -253,8 +253,8 @@ def test_no_sube_duplicadas_recibos_ni_anexos(drive, crear):
     crear(b"%PDF-1.4 ab", tipo="abono", numero="A-1")
     sincronizar_drive(client=drive)
     assert drive.subidas == [
-        "2026-03-31 Acme F-1.pdf",
-        "2026-03-31 Acme factura rectificativa A-1.pdf",
+        "Acme 2026-03-31 F-1.pdf",
+        "Acme 2026-03-31 factura rectificativa A-1.pdf",
     ]
 
 
@@ -263,8 +263,8 @@ def test_cada_empresa_en_su_carpeta(drive, crear, tech):
     crear(b"%PDF-1.4 t", numero="T-1", empresa=tech)
     sincronizar_drive(client=drive)
     anio_tech = drive.buscar("2026", drive.tech)
-    assert drive.buscar("2026-03-31 Acme T-1.pdf", anio_tech)
-    assert drive.buscar("2026-03-31 Acme F-1.pdf", drive.buscar("2026", drive.facturas))
+    assert drive.buscar("Acme 2026-03-31 T-1.pdf", anio_tech)
+    assert drive.buscar("Acme 2026-03-31 F-1.pdf", drive.buscar("2026", drive.facturas))
 
 
 def test_sin_empresa_no_se_sube_y_se_avisa(drive, crear):
@@ -307,7 +307,7 @@ def test_modo_prueba_no_toca_nada(drive, crear):
     resumen = sincronizar_drive(client=drive, probar=True)
 
     factura.refresh_from_db()
-    assert resumen.subidas == ["ANDROMEDA SOLUTIONS / 2026 / 2026-03-31 Acme F-1.pdf"]
+    assert resumen.subidas == ["ANDROMEDA SOLUTIONS / 2026 / Acme 2026-03-31 F-1.pdf"]
     assert resumen.carpetas_creadas == ["ANDROMEDA SOLUTIONS / 2026"]
     assert drive.subidas == []
     assert drive.subcarpeta(drive.facturas, "2026") is None
@@ -329,8 +329,8 @@ def test_sin_permisos_se_para(drive, crear, monkeypatch):
 @pytest.mark.parametrize(
     ("tipo", "numero", "esperado"),
     [
-        ("factura", "A/23: 7", "2026-03-31 Acme A 23 7.pdf"),
-        ("abono", "R-1", "2026-03-31 Acme factura rectificativa R-1.pdf"),
+        ("factura", "A/23: 7", "Acme 2026-03-31 A 23 7.pdf"),
+        ("abono", "R-1", "Acme 2026-03-31 factura rectificativa R-1.pdf"),
     ],
 )
 def test_nombre_en_drive(crear, tipo, numero, esperado):
@@ -349,7 +349,7 @@ def test_comando_en_modo_prueba(drive, crear, monkeypatch, capsys):
     monkeypatch.setattr("integrations.drive.get_client", lambda: drive)
     call_command("sincronizar_drive", "--probar")
     salida = capsys.readouterr().out
-    assert "Subiría ANDROMEDA SOLUTIONS / 2026 / 2026-03-31 Acme F-1.pdf" in salida
+    assert "Subiría ANDROMEDA SOLUTIONS / 2026 / Acme 2026-03-31 F-1.pdf" in salida
     assert drive.subidas == []
 
 
@@ -485,7 +485,7 @@ def test_corrige_el_nombre_si_se_subio_antes_de_leer_la_fecha(drive, crear):
     factura = crear(fecha_factura=None, numero="")  # aún sin extraer: fecha del correo
     sincronizar_drive(client=drive)
     factura.refresh_from_db()
-    assert factura.drive_nombre == "2026-04-02 Acme Invoice.pdf"
+    assert factura.drive_nombre == "Acme 2026-04-02 Invoice.pdf"
 
     # Se extrae después: cambian la fecha y el nº
     FacturaRecibida.objects.filter(pk=factura.pk).update(
@@ -494,9 +494,9 @@ def test_corrige_el_nombre_si_se_subio_antes_de_leer_la_fecha(drive, crear):
     resumen = sincronizar_drive(client=drive)
 
     factura.refresh_from_db()
-    assert resumen.renombradas == ["2026/2026-04-02 Acme Invoice.pdf → 2026-03-31 Acme F-1.pdf"]
-    assert drive.items[factura.drive_id]["name"] == "2026-03-31 Acme F-1.pdf"
-    assert factura.drive_nombre == "2026-03-31 Acme F-1.pdf"
+    assert resumen.renombradas == ["2026/Acme 2026-04-02 Invoice.pdf → Acme 2026-03-31 F-1.pdf"]
+    assert drive.items[factura.drive_id]["name"] == "Acme 2026-03-31 F-1.pdf"
+    assert factura.drive_nombre == "Acme 2026-03-31 F-1.pdf"
     assert len(drive.subidas) == 1
 
 
@@ -518,3 +518,26 @@ def test_no_renombra_lo_que_no_debe(drive, crear, caso):
 
     assert drive.renombradas == []
     assert bool(resumen.renombradas) == (caso == "probar")  # en prueba solo lo anuncia
+
+
+def test_el_proveedor_siempre_delante(drive, crear):
+    anio = drive.carpeta("2026", drive.facturas)
+    contabilizado = drive.carpeta("CONTABILIZADO", anio)
+    ajena = drive.fichero("EB1F4288.pdf", contabilizado, b"%PDF-1.4 a")
+    antigua = drive.fichero("2026-03-31 Acme F-2.pdf", anio, b"%PDF-1.4 b")
+    bien = drive.fichero("ACME marzo.pdf", anio, b"%PDF-1.4 c")
+    facturas = [crear(b"%PDF-1.4 a"), crear(b"%PDF-1.4 b", numero="F-2"), crear(b"%PDF-1.4 c")]
+
+    sincronizar_drive(client=drive)
+
+    assert drive.items[ajena]["name"] == "Acme EB1F4288.pdf"
+    assert drive.items[antigua]["name"] == "Acme 2026-03-31 F-2.pdf"
+    assert drive.items[bien]["name"] == "ACME marzo.pdf"
+    for f in facturas:
+        f.refresh_from_db()
+    # La ajena no pasa a ser "nuestra": no se le volverá a cambiar el nombre entero
+    assert [f.drive_nombre for f in facturas] == ["", "Acme 2026-03-31 F-2.pdf", ""]
+
+    drive.renombradas.clear()
+    sincronizar_drive(client=drive)
+    assert drive.renombradas == []

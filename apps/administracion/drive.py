@@ -18,6 +18,9 @@ alguien la hubiera subido antes a mano. Entonces:
   vuelve a subir: se avisa como "fuera de sitio" para que contabilidad la mueva.
 - No está → se sube a la raíz de <año>, creando <año> y <año>/CONTABILIZADO si no existen.
 
+Los ficheros se llaman "Proveedor fecha nº.pdf" y todos los ligados a una factura del sistema
+llevan el proveedor delante, aunque los haya subido otro (ver nombre_corregido).
+
 Solo se suben facturas y abonos con la empresa identificada: no los recibos de pago, ni los
 anexos, ni las duplicadas.
 """
@@ -38,6 +41,7 @@ from integrations import drive
 from integrations.drive import DriveAuthError, DriveClient, DriveError
 
 from .models import Empresa, FacturaRecibida
+from .utils import normalizar
 
 logger = logging.getLogger(__name__)
 
@@ -89,15 +93,43 @@ class Resumen:
 
 
 def nombre_en_drive(factura: FacturaRecibida) -> str:
-    """ "2026-01-31 Hetzner R0012345.pdf": se ordena por fecha y se reconoce de un vistazo."""
+    """ "Hetzner 2026-01-31 R0012345.pdf": siempre con el proveedor delante."""
     fecha = factura.fecha_factura or timezone.localdate(factura.recibida_en)
     original = PurePath(factura.nombre_archivo)
-    partes = [fecha.isoformat(), factura.proveedor.nombre]
+    partes = [factura.proveedor.nombre, fecha.isoformat()]
     if factura.tipo == FacturaRecibida.Tipo.ABONO:
         partes.append("factura rectificativa")
     partes.append(factura.numero_factura or original.stem)
     nombre = re.sub(r'[\\/:*?"<>|\s]+', " ", " ".join(partes)).strip()
     return f"{nombre}{original.suffix.lower() or '.pdf'}"
+
+
+def nombre_corregido(factura: FacturaRecibida, ubicacion: Ubicacion, anio: int):
+    """Nuevo nombre para el fichero de la factura en Drive, o None si está bien como está.
+
+    Todos los ficheros ligados a una factura llevan el proveedor delante:
+
+    - Los que subimos nosotros y nadie ha tocado, mientras sigan en la carpeta de su año sin
+      contabilizar, se ponen al día con `nombre_en_drive` (p. ej. si se subieron antes de
+      leer la fecha del PDF).
+    - Los del formato antiguo ("2026-01-31 Hetzner R001.pdf") pasan a "Hetzner 2026-01-31
+      R001.pdf".
+    - A los demás (subidos a mano, renombrados por contabilidad…) se les antepone el proveedor,
+      salvo que ya empiecen por él.
+
+    Devuelve (nombre, es_nuestro): es_nuestro indica que el nombre lo ponemos nosotros entero.
+    """
+    proveedor = factura.proveedor.nombre
+    actual = ubicacion.nombre
+    deseado = nombre_en_drive(factura)
+    nuestro = bool(factura.drive_nombre) and actual == factura.drive_nombre
+    if nuestro and ubicacion.anio == anio and not ubicacion.contabilizada:
+        return (deseado, True) if actual != deseado else None
+    if normalizar(actual).startswith(normalizar(proveedor)):
+        return None
+    if m := re.fullmatch(rf"(\d{{4}}-\d{{2}}-\d{{2}}) {re.escape(proveedor)} (.+)", actual):
+        return f"{proveedor} {m[1]} {m[2]}", True
+    return f"{proveedor} {actual}", False
 
 
 def leer_pdf(factura: FacturaRecibida) -> bytes:
@@ -232,22 +264,16 @@ def _sincronizar_factura(client, factura, indice, carpeta_del_anio, resumen, pro
         contabilizada = ubicacion.contabilizada and ubicacion.anio == anio
         if contabilizada and not factura.contabilizada_en:
             resumen.nuevas_contabilizadas.append(str(factura))
-        nombre = nombre_en_drive(factura)
-        # La subimos nosotros, nadie la ha tocado y su nombre ya no es el bueno (p. ej. se subió
-        # antes de leer la fecha de la factura): se corrige mientras no esté contabilizada
-        renombrar = (
-            ubicacion.anio == anio
-            and not ubicacion.contabilizada
-            and factura.drive_nombre
-            and ubicacion.nombre == factura.drive_nombre
-            and ubicacion.nombre != nombre
-        )
+        renombrar = nombre_corregido(factura, ubicacion, anio)
         if renombrar:
-            resumen.renombradas.append(f"{ubicacion.ruta} → {nombre}")
+            resumen.renombradas.append(f"{ubicacion.ruta} → {renombrar[0]}")
         if probar:
             return
         if renombrar:
-            factura.drive_nombre = client.renombrar(ubicacion.drive_id, nombre).name
+            nombre, es_nuestro = renombrar
+            nuevo = client.renombrar(ubicacion.drive_id, nombre).name
+            # Si el nombre es de otro (solo le añadimos el proveedor), no lo volvemos a cambiar
+            factura.drive_nombre = nuevo if es_nuestro else ""
         factura.drive_id = ubicacion.drive_id
         factura.subida_a_drive_en = factura.subida_a_drive_en or ahora
         factura.contabilizada_en = (factura.contabilizada_en or ahora) if contabilizada else None
