@@ -1,10 +1,19 @@
 from django import forms
 from django.conf import settings
 
-from .models import Proveedor
+from .models import Proveedor, opciones_extractores
 
 
 class ProveedorForm(forms.ModelForm):
+    extractores = forms.MultipleChoiceField(
+        label="Formatos de factura",
+        required=False,
+        choices=opciones_extractores,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Los que leen sus PDF. Marca varios si el proveedor ha cambiado el diseño de "
+        "sus facturas: se prueban todos y gana el que cuadra. Ninguno = no se extraen.",
+    )
+
     class Meta:
         model = Proveedor
         fields = [
@@ -12,7 +21,7 @@ class ProveedorForm(forms.ModelForm):
             "cif",
             "email",
             "etiqueta_gmail",
-            "extractor",
+            "extractores",
             "textos_pago",
             "activo",
             "notas",

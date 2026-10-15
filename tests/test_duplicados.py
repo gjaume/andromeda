@@ -44,7 +44,9 @@ def extractor(monkeypatch):
 
 @pytest.fixture
 def proveedor(db):
-    return Proveedor.objects.create(nombre="Acme", etiqueta_gmail="Acme", extractor="por_nombre")
+    return Proveedor.objects.create(
+        nombre="Acme", etiqueta_gmail="Acme", extractores=["por_nombre"]
+    )
 
 
 @pytest.fixture
@@ -100,7 +102,7 @@ def test_una_copia_recibida_antes_pasa_a_ser_la_original(nueva):
 def test_no_son_duplicadas_si_cambia_tipo_o_proveedor(nueva, distinta):
     if distinta.get("prov"):
         distinta["prov"] = Proveedor.objects.create(
-            nombre="Otro", etiqueta_gmail="Otro", extractor="por_nombre"
+            nombre="Otro", etiqueta_gmail="Otro", extractores=["por_nombre"]
         )
     nueva("a.pdf", "F-1")
     assert nueva("b.pdf", "F-1", dias=1, **distinta).duplicada_de is None

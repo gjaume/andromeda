@@ -8,7 +8,7 @@ from apps.administracion.extraccion.servicio import (
     leer,
     marcar_todos_los_duplicados,
 )
-from apps.administracion.models import FacturaRecibida
+from apps.administracion.models import FacturaRecibida, Proveedor
 
 
 class Command(BaseCommand):
@@ -46,10 +46,12 @@ class Command(BaseCommand):
             return
         facturas = FacturaRecibida.objects.select_related("proveedor").order_by("recibida_en")
         if proveedor:
+            # El filtro por extractor se hace aparte: SQLite no busca dentro de listas JSON
+            con_extractor = [p.pk for p in Proveedor.objects.all() if proveedor in p.extractores]
             facturas = facturas.filter(
                 Q(proveedor__nombre__iexact=proveedor)
                 | Q(proveedor__etiqueta_gmail__iexact=proveedor)
-                | Q(proveedor__extractor=proveedor)
+                | Q(proveedor__in=con_extractor)
             )
             if not facturas.exists():
                 raise CommandError(f"No hay facturas del proveedor {proveedor!r}")
@@ -89,7 +91,7 @@ class Command(BaseCommand):
         for f in facturas:
             cabecera = f"#{f.pk} {f.proveedor} · {f.nombre_archivo}"
             try:
-                datos = leer(f)
+                clave, datos = leer(f)
             except ExtraccionError as exc:
                 self.stdout.write(self.style.ERROR(f"✗ {cabecera}: {exc}"))
                 continue
@@ -98,7 +100,7 @@ class Command(BaseCommand):
             bien += not avisos
             self.stdout.write(estilo(f"{'!' if avisos else '✓'} {cabecera}"))
             self.stdout.write(
-                f"    {datos.tipo} {datos.numero!r} {datos.fecha} {datos.moneda} "
+                f"    [{clave}] {datos.tipo} {datos.numero!r} {datos.fecha} {datos.moneda} "
                 f"base={datos.base_imponible} imp={datos.impuestos} total={datos.total}"
             )
             for linea in datos.lineas:

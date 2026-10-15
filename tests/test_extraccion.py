@@ -46,7 +46,9 @@ def extractor(monkeypatch):
 
 @pytest.fixture
 def factura(db):
-    proveedor = Proveedor.objects.create(nombre="Acme", etiqueta_gmail="Acme", extractor="falso")
+    proveedor = Proveedor.objects.create(
+        nombre="Acme", etiqueta_gmail="Acme", extractores=["falso"]
+    )
     ahora = timezone.now()
     correo = CorreoFactura.objects.create(proveedor=proveedor, gmail_id="m1", recibido_en=ahora)
     factura = FacturaRecibida(
@@ -111,7 +113,7 @@ def test_los_errores_quedan_registrados(extractor, factura, error, detalle):
 
 
 def test_proveedor_sin_extractor(factura):
-    Proveedor.objects.filter(pk=factura.proveedor_id).update(extractor="")
+    Proveedor.objects.filter(pk=factura.proveedor_id).update(extractores=[])
     factura.refresh_from_db()
     extraer_datos(factura)
     assert factura.extraccion_estado == "sin_extractor"
@@ -201,3 +203,63 @@ def test_los_anexos_no_son_un_error(extractor, factura):
     extraer_datos(factura)
     assert (factura.tipo, factura.extraccion_estado) == ("anexo", "ok")
     assert factura.total is None
+
+
+class ExtractorAntiguo(ExtractorFalso):
+    """Otro formato del mismo proveedor (p. ej. antes de cambiar de programa de facturación)."""
+
+    clave = "antiguo"
+    nombre = "Antiguo"
+
+
+@pytest.fixture
+def antiguo(monkeypatch, factura):
+    viejo = ExtractorAntiguo()
+    monkeypatch.setitem(registro_real, "antiguo", viejo)
+    Proveedor.objects.filter(pk=factura.proveedor_id).update(extractores=["falso", "antiguo"])
+    factura.refresh_from_db()
+    return viejo
+
+
+def test_con_varios_formatos_gana_el_que_lee_la_factura(extractor, antiguo, factura):
+    extractor.datos = ExtraccionError("No encuentro las líneas")
+    antiguo.datos = DatosFactura(
+        numero="A-1", moneda="EUR", base_imponible=Decimal("10"), impuestos=Decimal("0"),
+        total=Decimal("10"), lineas=[Linea("Servicio", Decimal("10"))],
+    )  # fmt: skip
+
+    extraer_datos(factura)
+
+    assert (factura.extraccion_estado, factura.numero_factura) == ("ok", "A-1")
+    assert factura.extractor == "antiguo"
+    assert factura.nombre_extractor == "Antiguo"
+
+
+def test_con_varios_formatos_prefiere_el_que_cuadra(extractor, antiguo, factura):
+    import copy
+
+    antiguo.datos = copy.deepcopy(extractor.datos)
+    extractor.datos.total = Decimal("150.00")  # lee, pero no cuadra
+    extraer_datos(factura)
+    assert (factura.extraccion_estado, factura.extractor) == ("ok", "antiguo")
+
+
+def test_si_ningun_formato_la_lee_se_explica_cada_motivo(extractor, antiguo, factura):
+    extractor.datos = ExtraccionError("No encuentro las líneas")
+    antiguo.datos = ExtraccionError("No encuentro el total")
+
+    extraer_datos(factura)
+
+    assert factura.extraccion_estado == "error"
+    assert factura.extractor == ""
+    assert "Falso: No encuentro las líneas" in factura.extraccion_detalle
+    assert "Antiguo: No encuentro el total" in factura.extraccion_detalle
+
+
+def test_el_formulario_admite_varios_formatos(extractor, antiguo, factura):
+    from apps.administracion.forms import ProveedorForm
+
+    datos = {"nombre": "Acme", "etiqueta_gmail": "Acme", "extractores": ["antiguo", "falso"]}
+    form = ProveedorForm(datos, instance=factura.proveedor)
+    assert form.is_valid(), form.errors
+    assert form.save().extractores == ["antiguo", "falso"]

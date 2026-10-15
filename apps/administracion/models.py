@@ -81,12 +81,14 @@ class Proveedor(models.Model):
     activo = models.BooleanField(
         default=True, help_text="Solo se buscan facturas de los proveedores activos."
     )
-    extractor = models.CharField(
-        "formato de factura",
-        max_length=50,
+    # Claves de los extractores (apps/administracion/extraccion): varios si el proveedor ha
+    # cambiado el diseño de sus facturas. Se prueban todos y gana el que lee bien el PDF.
+    extractores = models.JSONField(
+        "formatos de factura",
+        default=list,
         blank=True,
-        choices=opciones_extractores,
-        help_text="Extractor que lee las líneas y totales de sus PDF. Vacío = no se extraen.",
+        help_text="Extractores que leen las líneas y totales de sus PDF; varios si el proveedor "
+        "ha cambiado el diseño de sus facturas. Ninguno = no se extraen.",
     )
     textos_pago = models.TextField(
         "textos del pago",
@@ -106,6 +108,11 @@ class Proveedor(models.Model):
 
     def __str__(self) -> str:
         return self.nombre
+
+    @property
+    def nombres_extractores(self) -> list[str]:
+        nombres = dict(opciones_extractores())
+        return [nombres.get(clave, clave) for clave in self.extractores]
 
     @property
     def lista_textos_pago(self) -> list[str]:
@@ -284,6 +291,8 @@ class FacturaRecibida(models.Model):
     )
     extraccion_detalle = models.TextField("detalle de la extracción", blank=True)
     extraida_en = models.DateTimeField(null=True, blank=True)
+    # Clave del extractor que leyó el PDF (de los del proveedor), vacía si ninguno pudo
+    extractor = models.CharField("formato", max_length=50, blank=True)
     # Mismo proveedor, tipo y nº de factura que otra recibida antes (p. ej. el PDF reenviado en
     # un recordatorio): no se cuenta para no sumar dos veces el mismo gasto.
     duplicada_de = models.ForeignKey(
@@ -342,6 +351,10 @@ class FacturaRecibida(models.Model):
 
     def __str__(self) -> str:
         return f"{self.proveedor} · {self.nombre_archivo}"
+
+    @property
+    def nombre_extractor(self) -> str:
+        return dict(opciones_extractores()).get(self.extractor, self.extractor)
 
     @property
     def pagada(self) -> bool:

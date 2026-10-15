@@ -111,7 +111,7 @@ class Documento:
 
 
 class Extractor:
-    clave: ClassVar[str]  # identificador estable, se guarda en Proveedor.extractor
+    clave: ClassVar[str]  # identificador estable, se guarda en Proveedor.extractores
     nombre: ClassVar[str]  # para mostrar, p. ej. "Hetzner (factura mensual)"
 
     def extraer(self, doc: Documento) -> DatosFactura:

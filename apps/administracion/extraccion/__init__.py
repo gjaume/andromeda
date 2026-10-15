@@ -1,7 +1,8 @@
 """Extracción de líneas y totales de las facturas en PDF, con un extractor por formato.
 
 Para añadir un formato: crea `extractores/<clave>.py` con una clase decorada con `@registrar`
-y asígnala al proveedor en su ficha (campo "formato de factura"). Se carga sola.
+y asígnala al proveedor en su ficha (campo "formatos de factura"). Se carga sola. Si el
+proveedor cambia el diseño de sus facturas, se añade un extractor nuevo y se le asignan los dos.
 """
 
 import importlib

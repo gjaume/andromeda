@@ -4,6 +4,7 @@ from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import display
 
+from .forms import ProveedorForm
 from .models import (
     CorreoFactura,
     CorreoNomina,
@@ -36,9 +37,14 @@ class MovimientoPagoAdmin(ModelAdmin):
 
 @admin.register(Proveedor)
 class ProveedorAdmin(ModelAdmin):
-    list_display = ("nombre", "cif", "etiqueta_gmail", "extractor", "textos_pago", "activo")
-    list_filter = ("activo", "extractor")
+    list_display = ("nombre", "cif", "etiqueta_gmail", "formatos", "textos_pago", "activo")
+    list_filter = ("activo",)
     search_fields = ("nombre", "cif", "etiqueta_gmail")
+    form = ProveedorForm  # los formatos de factura, como casillas
+
+    @display(description="formatos de factura")
+    def formatos(self, proveedor: Proveedor) -> str:
+        return ", ".join(proveedor.nombres_extractores) or "—"
 
 
 @display(description="Nombre archivo", ordering="nombre_archivo")

@@ -44,12 +44,42 @@ def documento(factura: FacturaRecibida) -> Documento:
         return Documento(fichero.read(), factura.nombre_archivo)
 
 
-def leer(factura: FacturaRecibida, doc: Documento | None = None) -> DatosFactura:
-    """Extrae los datos sin guardarlos (para probar extractores)."""
-    clave = factura.proveedor.extractor
-    if clave not in registro:
-        raise ExtraccionError(f"El proveedor no tiene un extractor válido ({clave or 'vacío'})")
-    return registro[clave].extraer(doc or documento(factura))
+def leer(factura: FacturaRecibida, doc: Documento | None = None) -> tuple[str, DatosFactura]:
+    """Extrae los datos sin guardarlos: (clave del extractor que lo ha leído, datos).
+
+    Con varios extractores (el proveedor cambió el diseño de sus facturas) se prueban todos:
+    gana el primero cuyos importes cuadran y, si ninguno cuadra, el primero que lee algo. Si
+    alguno reconoce el PDF como anexo (NoEsFactura) y ninguno lo lee como factura, se relanza.
+    Si ninguno lo lee, ExtraccionError con el motivo de cada uno.
+    """
+    claves = factura.proveedor.extractores
+    validas = [c for c in claves if c in registro]
+    if not validas:
+        raise ExtraccionError(f"El proveedor no tiene un extractor válido ({claves or 'ninguno'})")
+    doc = doc or documento(factura)
+    leidas, anexo, errores = [], None, []
+    for clave in validas:
+        try:
+            datos = registro[clave].extraer(doc)
+        except NoEsFactura as exc:
+            anexo = anexo or exc
+            continue
+        except ExtraccionError as exc:
+            errores.append((clave, exc))
+            continue
+        if not comprobar(datos):
+            return clave, datos
+        leidas.append((clave, datos))
+    if leidas:
+        return leidas[0]
+    if anexo:
+        raise anexo
+    if len(errores) == 1:
+        raise errores[0][1]
+    raise ExtraccionError(
+        "Ningún formato lee esta factura:\n"
+        + "\n".join(f"- {registro[clave].nombre}: {exc}" for clave, exc in errores)
+    )
 
 
 def detectar_empresa(texto: str, empresas: list[Empresa]) -> Empresa | None:
@@ -69,18 +99,18 @@ def detectar_empresa(texto: str, empresas: list[Empresa]) -> Empresa | None:
 def extraer_datos(factura: FacturaRecibida) -> FacturaRecibida:
     """Rellena los datos extraídos de la factura. Nunca lanza: el fallo queda en su estado."""
     Estado = FacturaRecibida.Extraccion
-    datos, avisos, anexo, empresa = None, [], False, None
+    datos, avisos, anexo, empresa, clave = None, [], False, None, ""
     try:
         doc = documento(factura)
         empresa = detectar_empresa(doc.texto, list(Empresa.objects.all()))
     except Exception:  # el PDF no se puede leer: lo dirá el extractor, si lo hay
         logger.warning("No se pudo leer el texto de la factura %s", factura.pk, exc_info=True)
         doc = None
-    if not factura.proveedor.extractor:
+    if not factura.proveedor.extractores:
         estado, detalle = Estado.SIN_EXTRACTOR, ""
     else:
         try:
-            datos = leer(factura, doc)
+            clave, datos = leer(factura, doc)
         except NoEsFactura as exc:
             estado, detalle, anexo = Estado.OK, str(exc), True
         except ExtraccionError as exc:
@@ -99,6 +129,7 @@ def extraer_datos(factura: FacturaRecibida) -> FacturaRecibida:
         factura.extraccion_estado = estado
         factura.extraccion_detalle = detalle
         factura.extraida_en = timezone.now()
+        factura.extractor = clave
         # Si no se reconoce, se conserva la que hubiera (p. ej. asignada a mano en el admin)
         factura.empresa = empresa or factura.empresa
         if datos:

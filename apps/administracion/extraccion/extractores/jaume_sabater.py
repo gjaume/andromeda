@@ -45,7 +45,7 @@ LINEA = re.compile(
 @registrar
 class JaumeSabater(Extractor):
     clave = "jaume_sabater"
-    nombre = "Jaume Sabater (factura de servicios)"
+    nombre = "Jaume Sabater (desde mayo de 2026)"
 
     def extraer(self, doc: Documento) -> DatosFactura:
         texto = doc.texto

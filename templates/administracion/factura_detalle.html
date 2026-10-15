@@ -34,7 +34,7 @@
       {% if otras_del_pago %}<br><span class="small">El mismo pago cubre también: {% for o in otras_del_pago %}<a href="{% url 'administracion:factura_detalle' o.pk %}">{{ o.numero_factura|default:o.nombre_archivo }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
     </dd>
     <dt>Contabilidad</dt><dd>{% include "administracion/_contabilidad.html" %}</dd>
-    <dt>Extracción</dt><dd>{% include "administracion/_estado_extraccion.html" %}{% if factura.extraida_en %} <span class="muted small">{{ factura.extraida_en|date:"d/m/Y H:i" }}</span>{% endif %}</dd>
+    <dt>Extracción</dt><dd>{% include "administracion/_estado_extraccion.html" %}{% if factura.extraida_en %} <span class="muted small">{{ factura.extraida_en|date:"d/m/Y H:i" }}</span>{% endif %}{% if factura.extractor %}<br><span class="muted small">Formato: {{ factura.nombre_extractor }}</span>{% endif %}</dd>
   </dl>
 </section>
 
@@ -49,7 +49,7 @@
     {{ factura.extraccion_detalle|linebreaksbr }}
   </div>
 {% elif factura.extraccion_estado == "sin_extractor" %}
-  <p class="msg">El proveedor no tiene asignado un formato de factura, así que no se leen sus líneas. Se asigna en la <a href="{% url 'administracion:proveedor_editar' factura.proveedor.pk %}">ficha del proveedor</a>.</p>
+  <p class="msg">El proveedor no tiene asignado ningún formato de factura, así que no se leen sus líneas. Se asigna en la <a href="{% url 'administracion:proveedor_editar' factura.proveedor.pk %}">ficha del proveedor</a>.</p>
 {% endif %}
 
 <h2 class="section-title">Líneas</h2>
