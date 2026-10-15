@@ -5,13 +5,16 @@ guardan dos PDF: el que tiene las nóminas de todos los empleados y el resumen. 
 traen además un PDF por empleado; esos solo se guardan si falta el de todos (hay meses en que
 la gestoría no lo manda), para que el mes no se quede sin nóminas. Los PDF no se procesan.
 
-Cada correo se procesa una sola vez (CorreoNomina), tenga o no nóminas.
+Cada correo se procesa una sola vez (CorreoNomina), tenga o no nóminas. Se guardan también
+las correcciones: el último PDF recibido de cada documento es el bueno y los anteriores quedan
+marcados como sustituidos (Nomina.sustituida_por).
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import PurePath
@@ -142,6 +145,7 @@ def _guardar_correo(gmail: GmailClient, mensaje: GmailMessage, empresas: list[Em
         detectadas.pop() if len(detectadas) == 1 else detectar_empresa(mensaje.subject, empresas)
     )
 
+    meses = set()
     with transaction.atomic():
         correo = CorreoNomina.objects.create(
             gmail_id=mensaje.id,
@@ -162,4 +166,38 @@ def _guardar_correo(gmail: GmailClient, mensaje: GmailMessage, empresas: list[Em
             )
             nomina.archivo.save(adjunto.filename, ContentFile(contenido), save=False)
             nomina.save()
+            meses.add((nomina.empresa_id, nomina.periodo))
+        for empresa_id, mes in meses:
+            marcar_versiones(empresa_id, mes)
     return len(contenidos)
+
+
+def clave_documento(nomina: Nomina) -> tuple[str, str]:
+    """Qué documento es: el tipo y, si es de un empleado, su nombre (sin mes ni "OK")."""
+    nombre = _sin_prefijos(nomina.nombre_archivo) if nomina.tipo == Tipo.EMPLEADO else ""
+    return nomina.tipo, nombre
+
+
+def marcar_versiones(empresa_id: int | None, mes: date) -> int:
+    """En cada documento del mes, el último recibido es el bueno y los anteriores apuntan a él.
+
+    Devuelve cuántas nóminas han cambiado.
+    """
+    documentos = defaultdict(list)
+    nominas = Nomina.objects.filter(empresa_id=empresa_id, periodo=mes)
+    for nomina in nominas.order_by("-recibida_en", "-pk"):
+        documentos[clave_documento(nomina)].append(nomina)
+    cambiadas = 0
+    for ultima, *anteriores in documentos.values():
+        for nomina in [ultima, *anteriores]:
+            sustituida_por = None if nomina is ultima else ultima.pk
+            if nomina.sustituida_por_id != sustituida_por:
+                nomina.sustituida_por_id = sustituida_por
+                nomina.save(update_fields=["sustituida_por"])
+                cambiadas += 1
+    return cambiadas
+
+
+def marcar_todas_las_versiones() -> int:
+    meses = Nomina.objects.values_list("empresa_id", "periodo").distinct()
+    return sum(marcar_versiones(empresa_id, mes) for empresa_id, mes in meses)

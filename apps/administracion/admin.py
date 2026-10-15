@@ -252,7 +252,7 @@ NOMINA_EDITABLES = {"empresa", "periodo", "tipo"}
 
 @admin.register(Nomina)
 class NominaAdmin(ModelAdmin):
-    list_display = ("periodo", "empresa", "tipo", abrir_nomina, "recibida_en")
+    list_display = ("periodo", "empresa", "tipo", abrir_nomina, "recibida_en", "sustituida_por")
     list_filter = ("tipo", "empresa")
     search_fields = ("nombre_archivo", "correo__asunto")
     readonly_fields = [
@@ -262,3 +262,12 @@ class NominaAdmin(ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    def save_model(self, request, obj, form, change):
+        from .nominas import marcar_versiones
+
+        antes = Nomina.objects.filter(pk=obj.pk).values_list("empresa_id", "periodo").first()
+        super().save_model(request, obj, form, change)
+        # Al cambiar el mes, la empresa o el tipo cambia qué versión es la última
+        for empresa_id, mes in {antes, (obj.empresa_id, obj.periodo)} - {None}:
+            marcar_versiones(empresa_id, mes)

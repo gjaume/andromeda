@@ -445,7 +445,11 @@ class NominaListView(DepartmentRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        nominas = Nomina.objects.select_related("correo", "empresa")
+        nominas = (
+            Nomina.objects.select_related("correo", "empresa", "sustituida_por")
+            .annotate(num_anteriores=Count("versiones_anteriores"))
+            .order_by("-periodo", "empresa__nombre", "tipo", "-recibida_en", "pk")
+        )
         valor = self.request.GET.get("empresa", "")
         self.empresa = Empresa.objects.filter(pk=valor).first() if valor.isdigit() else None
         if self.empresa:

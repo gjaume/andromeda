@@ -160,3 +160,48 @@ def test_listado_y_descarga(api, gmail, empresas, administracion):
 def test_solo_administracion_ve_las_nominas(client, make_user):
     client.force_login(make_user(departments=["Comercial"]))
     assert client.get(reverse("administracion:nominas")).status_code == 403
+
+
+def test_las_correcciones_sustituyen_a_la_version_anterior(api, gmail, empresas):
+    original = [
+        adjunto("1", "202602 PÉREZ GARCÍA, PEPA.pdf"),
+        adjunto("2", "202602 LÓPEZ RUIZ, JUAN.pdf"),
+        adjunto("3", "202602 Resumen nóminas Andromeda Solutions SLU.pdf"),
+    ]
+    correccion = [
+        adjunto("1", "202602 PÉREZ GARCÍA, PEPA OK.pdf"),
+        adjunto("2", "202602 Resumen nóminas Andromeda Solutions SLU OK.pdf"),
+    ]
+    api.get("/messages").respond(json={"messages": [{"id": "m2"}, {"id": "m1"}]})
+    m1, m2 = mensaje("m1", adjuntos=original), mensaje("m2", adjuntos=correccion)
+    m2["internalDate"] = str(int(m1["internalDate"]) + 86_400_000)  # un día después
+    api.get("/messages/m1").respond(json=m1)
+    api.get("/messages/m2").respond(json=m2)
+
+    sincronizar_nominas(client=gmail)
+
+    por_nombre = {n.nombre_archivo: n for n in Nomina.objects.all()}
+    resumen_ok = por_nombre["202602 Resumen nóminas Andromeda Solutions SLU OK.pdf"]
+    pepa_ok = por_nombre["202602 PÉREZ GARCÍA, PEPA OK.pdf"]
+    assert por_nombre["202602 Resumen nóminas Andromeda Solutions SLU.pdf"].sustituida_por == (
+        resumen_ok
+    )
+    assert por_nombre["202602 PÉREZ GARCÍA, PEPA.pdf"].sustituida_por == pepa_ok
+    # Lo que la corrección no trae sigue siendo bueno
+    assert por_nombre["202602 LÓPEZ RUIZ, JUAN.pdf"].sustituida_por is None
+    assert resumen_ok.sustituida_por is None and pepa_ok.sustituida_por is None
+
+
+def test_el_listado_marca_las_versiones(api, gmail, empresas, administracion):
+    api.get("/messages").respond(json={"messages": [{"id": "m2"}, {"id": "m1"}]})
+    m1 = mensaje("m1", adjuntos=[adjunto("1", "202602 Resumen nóminas Andromeda Solutions.pdf")])
+    m2 = mensaje("m2", adjuntos=[adjunto("1", "202602 Resumen nóminas Andromeda Solutions.pdf")])
+    m2["internalDate"] = str(int(m1["internalDate"]) + 86_400_000)
+    api.get("/messages/m1").respond(json=m1)
+    api.get("/messages/m2").respond(json=m2)
+    sincronizar_nominas(client=gmail)
+
+    html = administracion.get(reverse("administracion:nominas")).content.decode()
+
+    assert "última versión" in html
+    assert "sustituida por la del" in html

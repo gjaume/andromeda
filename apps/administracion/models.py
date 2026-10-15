@@ -430,6 +430,16 @@ class Nomina(models.Model):
     archivo = models.FileField(upload_to=nomina_upload_to, max_length=300)
     tamano = models.PositiveIntegerField("tamaño", default=0)
     recibida_en = models.DateTimeField(db_index=True)
+    # La gestoría a veces manda correcciones: el último PDF recibido del mismo documento (mismo
+    # mes, empresa, tipo y empleado) es el bueno, y los anteriores apuntan a él
+    sustituida_por = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="versiones_anteriores",
+        help_text="Versión posterior del mismo documento, que es la buena.",
+    )
 
     class Meta:
         ordering = ["-periodo", "tipo", "-recibida_en"]

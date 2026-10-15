@@ -7,6 +7,8 @@
     <p class="lede">
       Se descargan solas desde Gmail cada pocas horas, de la etiqueta <code>{{ etiqueta }}</code>:
       el PDF con las nóminas de todos los empleados y el resumen de cada mes.
+      Si la gestoría manda una corrección se guardan las dos versiones: la última recibida es la
+      buena y las anteriores aparecen en gris como sustituidas.
       {% if ultima_sincronizacion %}
         Última búsqueda: {{ ultima_sincronizacion.stopped|date:"j M Y, H:i" }}{% if not ultima_sincronizacion.success %} <strong class="text-danger">(falló)</strong>{% endif %}.
       {% endif %}
@@ -48,12 +50,17 @@
       </thead>
       <tbody>
         {% for n in nominas %}
-          <tr>
+          <tr{% if n.sustituida_por %} class="is-duplicate"{% endif %}>
             <td class="nowrap">{{ n.periodo|date:"F Y"|capfirst }}</td>
             <td>{{ n.empresa.nombre|default:"—" }}</td>
             <td>
               <a href="{% url 'administracion:nomina_archivo' n.pk %}" target="_blank" rel="noopener">{{ n.nombre_archivo }}</a>
               <span class="tag{% if n.tipo != 'nominas' %} tag-muted{% endif %}">{{ n.get_tipo_display }}</span>
+              {% if n.sustituida_por %}
+                <br><span class="tag tag-muted" title="Hay una versión posterior de este documento: la buena es la recibida el {{ n.sustituida_por.recibida_en|date:'d/m/Y H:i' }}">sustituida por la del {{ n.sustituida_por.recibida_en|date:"d/m/Y" }}</span>
+              {% elif n.num_anteriores %}
+                <br><span class="tag tag-ok" title="Corrige {{ n.num_anteriores }} versión{{ n.num_anteriores|pluralize:'es' }} anterior{{ n.num_anteriores|pluralize:'es' }} de este documento">última versión</span>
+              {% endif %}
             </td>
             <td><a href="{{ n.correo.gmail_url }}" target="_blank" rel="noopener">{{ n.correo.asunto|default:"(sin asunto)" }}</a><br><span class="muted small">{{ n.correo.remitente }}</span></td>
             <td class="nowrap">{{ n.recibida_en|date:"d/m/Y H:i" }}</td>

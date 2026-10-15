@@ -172,6 +172,7 @@ code { font-size: 0.9em; background: var(--line); padding: 0.05em 0.3em; border-
 .small { font-size: 0.85rem; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .tag-muted { background: var(--line); }
+.tag-ok { background: var(--ok); color: #fff; }
 .estado { display: inline-block; padding: 0 0.45em; font-size: 0.75rem; border-radius: 3px; background: var(--line); color: var(--ink); cursor: help; }
 .estado-revisar { background: #FCE8B2; }
 .estado-error { background: #F6D5D3; color: var(--danger); }
