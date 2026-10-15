@@ -40,7 +40,7 @@ from django.utils import timezone
 from integrations import drive
 from integrations.drive import DriveAuthError, DriveClient, DriveError
 
-from .models import Empresa, FacturaRecibida
+from .models import Empresa, FacturaRecibida, Proveedor
 from .utils import normalizar
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,8 @@ def nombre_corregido(factura: FacturaRecibida, ubicacion: Ubicacion, anio: int):
     - Los del formato antiguo ("2026-01-31 Hetzner R001.pdf") pasan a "Hetzner 2026-01-31
       R001.pdf".
     - A los demás (subidos a mano, renombrados por contabilidad…) se les antepone el proveedor,
-      salvo que ya empiecen por él.
+      salvo que ya empiecen por él. Si empiezan por el de otro proveedor (la factura se ha
+      reasignado), se cambia ese prefijo.
 
     Devuelve (nombre, es_nuestro): es_nuestro indica que el nombre lo ponemos nosotros entero.
     """
@@ -129,7 +130,16 @@ def nombre_corregido(factura: FacturaRecibida, ubicacion: Ubicacion, anio: int):
         return None
     if m := re.fullmatch(rf"(\d{{4}}-\d{{2}}-\d{{2}}) {re.escape(proveedor)} (.+)", actual):
         return f"{proveedor} {m[1]} {m[2]}", True
+    for otro in otros_proveedores(factura.proveedor_id):
+        if actual.startswith(f"{otro} "):
+            return f"{proveedor} {actual[len(otro) + 1 :]}", nuestro
     return f"{proveedor} {actual}", False
+
+
+def otros_proveedores(proveedor_id: int) -> list[str]:
+    """Nombres de los demás proveedores, los más largos primero ("PYR Asesores" antes que "PYR")."""
+    nombres = Proveedor.objects.exclude(pk=proveedor_id).values_list("nombre", flat=True)
+    return sorted(nombres, key=len, reverse=True)
 
 
 def leer_pdf(factura: FacturaRecibida) -> bytes:

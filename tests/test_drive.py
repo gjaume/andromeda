@@ -541,3 +541,16 @@ def test_el_proveedor_siempre_delante(drive, crear):
     drive.renombradas.clear()
     sincronizar_drive(client=drive)
     assert drive.renombradas == []
+
+
+def test_si_se_reasigna_la_factura_cambia_el_prefijo(drive, crear):
+    anio = drive.carpeta("2026", drive.facturas)
+    ajena = drive.fichero("Acme Invoice_1.pdf", drive.carpeta("CONTABILIZADO", anio), b"%PDF a")
+    factura = crear(b"%PDF a")
+    sincronizar_drive(client=drive)
+    assert drive.items[ajena]["name"] == "Acme Invoice_1.pdf"
+
+    otro = Proveedor.objects.create(nombre="Firma Digital", etiqueta_gmail="Firma")
+    FacturaRecibida.objects.filter(pk=factura.pk).update(proveedor=otro)
+    sincronizar_drive(client=drive)
+    assert drive.items[ajena]["name"] == "Firma Digital Invoice_1.pdf"
