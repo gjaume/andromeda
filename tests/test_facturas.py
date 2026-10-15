@@ -175,10 +175,27 @@ def test_reintenta_ante_limites_de_gmail(api, gmail, proveedor):
     assert listado.call_count == 2
 
 
-def test_la_sincronizacion_queda_programada(db):
-    tarea = Schedule.objects.get(name="Sincronizar facturas de Gmail")
-    assert tarea.func == "apps.administracion.tasks.sincronizar_facturas_gmail"
-    assert tarea.minutes == 240
+def test_solo_la_conciliacion_esta_programada(db):
+    # Las descargas de Gmail y la subida a Drive se lanzan a mano con los botones
+    assert list(Schedule.objects.values_list("func", flat=True)) == [
+        "apps.administracion.tasks.conciliar_pagos_drive"
+    ]
+
+
+def test_el_boton_busca_desde_el_ultimo_correo_procesado(proveedor):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.administracion.tasks import desde_el_ultimo_correo
+
+    hoy = timezone.localdate()
+    assert desde_el_ultimo_correo(CorreoFactura.objects) == hoy - timedelta(days=30)
+    hace_90 = timezone.now() - timedelta(days=90)
+    CorreoFactura.objects.create(proveedor=proveedor, gmail_id="m1", recibido_en=hace_90)
+    assert desde_el_ultimo_correo(CorreoFactura.objects) == (
+        timezone.localtime(hace_90).date() - timedelta(days=7)
+    )
 
 
 @pytest.mark.parametrize("valor", ["Iberdrola", "Gastos/Iberdrola", " gastos/Iberdrola/ "])

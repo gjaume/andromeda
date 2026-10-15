@@ -51,3 +51,11 @@ def test_superuser_sees_every_department(client, make_user):
     html = client.get(reverse("core:home")).content.decode()
     for label in ("Comercial", "Administración", "Marketing"):
         assert f"Inicio de {label}" in html
+
+
+def test_el_menu_sigue_el_orden_administracion_marketing_comercial(client, make_user):
+    client.force_login(make_user(is_superuser=True, is_staff=True))
+    html = client.get(reverse("core:home")).content.decode()
+    orden = ("Administración", "Marketing", "Comercial")
+    posiciones = [html.index(f"Inicio de {d}") for d in orden]
+    assert posiciones == sorted(posiciones)

@@ -364,7 +364,7 @@ class SincronizarFacturasView(DepartmentRequiredMixin, View):
 
 
 class SubirADriveView(DepartmentRequiredMixin, View):
-    """Sube ya a Drive las facturas pendientes, sin esperar a la tarea de cada hora."""
+    """Sube a Drive las facturas pendientes y actualiza cuáles están contabilizadas."""
 
     department = "administracion"
 
@@ -372,7 +372,7 @@ class SubirADriveView(DepartmentRequiredMixin, View):
         if not drive.is_configured():
             messages.error(request, "Drive no está configurado: falta la cuenta de servicio.")
         else:
-            async_task(TAREA_DRIVE, forzar=True, task_name="Subir facturas a Drive (manual)")
+            async_task(TAREA_DRIVE, task_name="Subir facturas a Drive (manual)")
             messages.success(
                 request,
                 "Subiendo a Drive las facturas pendientes. Recarga la página en un minuto para "

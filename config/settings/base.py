@@ -183,7 +183,7 @@ GMAIL = {
     "INVOICES_LABEL": env("GMAIL_INVOICES_LABEL", default="Gastos"),
     # Etiqueta de los correos de la gestoría con las nóminas de cada mes
     "NOMINAS_LABEL": env("GMAIL_NOMINAS_LABEL", default="Gastos/Nominas"),
-    # Ventana de búsqueda de cada sincronización programada
+    # Ventana mínima de búsqueda del botón y, por defecto, de los comandos
     "SYNC_DAYS": env.int("GMAIL_SYNC_DAYS", default=30),
 }
 
@@ -198,16 +198,15 @@ DRIVE = {
     ),
     # Dentro de la carpeta del año: contabilidad mueve aquí las facturas ya contabilizadas
     "CARPETA_CONTABILIZADO": env("DRIVE_CARPETA_CONTABILIZADO", default="CONTABILIZADO"),
-    # La tarea programada solo sube facturas con esto activado (el comando funciona siempre)
-    "ACTIVO": env.bool("DRIVE_FACTURAS_ACTIVO", default=False),
 }
 
 # --- Departamentos --------------------------------------------------------------------------
 # Cada departamento es un Group de Django. La navegación y los permisos de las vistas salen de aquí.
+# El orden es el del menú lateral.
 DEPARTMENTS = {
-    "comercial": "Comercial",
     "administracion": "Administración",
     "marketing": "Marketing",
+    "comercial": "Comercial",
 }
 
 # --- Admin (Unfold) -------------------------------------------------------------------------

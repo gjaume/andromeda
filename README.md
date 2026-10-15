@@ -65,11 +65,10 @@ Si el API usa otra cabecera o esquema de autenticación, ajusta `POPEYE_API_AUTH
 
 ## Facturas de proveedores (Gmail)
 
-Herramienta de Administración: cada proveedor tiene una subetiqueta de Gmail dentro de `Gastos` (p. ej. `Gastos/Iberdrola`), a la que una regla de Gmail envía sus correos. Cada 4 horas la tarea `sincronizar_facturas_gmail` revisa esas etiquetas en el buzón `admin@andronautic.com`, descarga los PDF adjuntos de los correos nuevos y los guarda en **Facturas recibidas**. Cada correo se procesa una sola vez, tenga o no factura.
+Herramienta de Administración: cada proveedor tiene una subetiqueta de Gmail dentro de `Gastos` (p. ej. `Gastos/Iberdrola`), a la que una regla de Gmail envía sus correos. El botón «Buscar facturas ahora» lanza la tarea `sincronizar_facturas_gmail`, que revisa esas etiquetas en el buzón `admin@andronautic.com` (desde una semana antes del último correo procesado, y como poco los últimos `GMAIL_SYNC_DAYS` días), descarga los PDF adjuntos de los correos nuevos y los guarda en **Facturas recibidas**. Cada correo se procesa una sola vez, tenga o no factura.
 
 - Proveedores: `/administracion/proveedores/`. La etiqueta se escribe sin el prefijo `Gastos/`.
 - Facturas: `/administracion/facturas/`, con botón para buscar en el momento.
-- Frecuencia: admin → Django Q → Tareas programadas → «Sincronizar facturas de Gmail».
 - Histórico completo: `uv run python manage.py sincronizar_facturas --dias 0`.
 
 ### Datos de cada factura (líneas, totales y moneda)
@@ -103,7 +102,7 @@ Cada empresa tiene una carpeta en Drive, dentro de la cual hay una subcarpeta po
     Administración/ANDROMEDA TECH GROUP/Facturas recibidas/2026/CONTABILIZADO
 
 El año de cada factura es el de su fecha de factura, o el del correo si todavía no se ha leído del PDF.
-La tarea programada «Sincronizar facturas con Drive» se ejecuta cada hora, recorre la carpeta de cada empresa y, para cada factura:
+El botón «Subir a Drive» de Facturas recibidas lanza la tarea `sincronizar_facturas_drive`, que recorre la carpeta de cada empresa y, para cada factura:
 
 - **Está en `<año>/CONTABILIZADO`**, o en una subcarpeta suya: queda como *contabilizada*.
 - **Está en otro sitio dentro de `<año>`**: queda como *subida a Drive*.
@@ -125,8 +124,6 @@ uv run python manage.py sincronizar_drive --probar   # qué subiría, sin tocar 
 uv run python manage.py sincronizar_drive            # sube y actualiza
 ```
 
-La tarea programada no hace nada hasta que se pone `DRIVE_FACTURAS_ACTIVO=true`. El comando funciona siempre.
-
 ### Conciliación con los pagos
 
 Cada factura se marca como **pagada**, indicando si fue por **tarjeta**, **domiciliación** o **transferencia**, cuando se encuentra su pago en los extractos que Administración mantiene en Drive.
@@ -144,6 +141,12 @@ Una factura casa con un movimiento si:
 
 Una transferencia que paga varias facturas seguidas del mismo proveedor, como varios meses de alquiler, también se reconoce.
 Los pagos se pueden corregir a mano en el admin marcando «pago marcado a mano»; la conciliación automática no toca esas facturas.
+
+## Nóminas (Gmail)
+
+En **Administración → Nóminas**, el botón «Buscar nóminas ahora» descarga los correos de la etiqueta `Gastos/Nominas` (`GMAIL_NOMINAS_LABEL`). De cada correo se guardan el PDF con las nóminas de todos los empleados y el resumen; los de cada empleado, solo si falta el de todos. El mes sale del prefijo `AAAAMM` del fichero. Si llega una corrección se guardan las dos versiones: la última recibida es la buena y las anteriores quedan como sustituidas.
+
+Histórico completo: `uv run python manage.py sincronizar_nominas --dias 0`.
 
 ## Despliegue en Render
 

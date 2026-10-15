@@ -339,11 +339,6 @@ def test_nombre_en_drive(crear, tipo, numero, esperado):
     assert nombre_en_drive(factura) == esperado
 
 
-def test_la_tarea_no_hace_nada_si_no_esta_activada(settings, crear):
-    settings.DRIVE = {**settings.DRIVE, "ACTIVO": False}
-    assert "desactivada" in sincronizar_facturas_drive()
-
-
 def test_comando_en_modo_prueba(drive, crear, monkeypatch, capsys):
     crear()
     monkeypatch.setattr("integrations.drive.get_client", lambda: drive)
@@ -467,18 +462,17 @@ def test_boton_muestra_las_pendientes_y_encola_la_tarea(cliente_admin, crear, mo
     url = reverse("administracion:facturas_subir_drive")
     respuesta = cliente_admin.post(url, {"volver": "/administracion/facturas/?proveedor=1"})
     assert respuesta.url == "/administracion/facturas/?proveedor=1"
-    assert encoladas[0][1]["forzar"] is True
+    assert encoladas[0][0] == ("apps.administracion.tasks.sincronizar_facturas_drive",)
     assert cliente_admin.post(url, {"volver": "https://malo.example/"}).url == reverse(
         "administracion:facturas"
     )
 
 
-def test_la_tarea_forzada_funciona_aunque_este_desactivada(settings, crear, drive, monkeypatch):
-    settings.DRIVE = {**settings.DRIVE, "ACTIVO": False}
+def test_la_tarea_sube_las_pendientes(crear, drive, monkeypatch):
     monkeypatch.setattr("integrations.drive.is_configured", lambda: True)
     monkeypatch.setattr("integrations.drive.get_client", lambda: drive)
     crear()
-    assert sincronizar_facturas_drive(forzar=True).startswith("1 subidas")
+    assert sincronizar_facturas_drive().startswith("1 subidas")
 
 
 def test_corrige_el_nombre_si_se_subio_antes_de_leer_la_fecha(drive, crear):
