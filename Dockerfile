@@ -22,7 +22,7 @@ RUN DJANGO_SETTINGS_MODULE=config.settings.prod DJANGO_SECRET_KEY=build \
 RUN useradd --create-home app && chown -R app /app
 USER app
 
-ENV DJANGO_SETTINGS_MODULE=config.settings.prod PORT=8000
-EXPOSE 8000
+ENV DJANGO_SETTINGS_MODULE=config.settings.prod PORT=8080
+EXPOSE 8080
 
 CMD gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --workers ${WEB_CONCURRENCY:-3} --timeout 60 --access-logfile -

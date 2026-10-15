@@ -13,7 +13,7 @@ cp .env.example .env          # rellena GOOGLE_OAUTH_* y, si lo necesitas, POPEY
 uv sync
 uv run python manage.py migrate
 uv run python manage.py createsuperuser   # para entrar en /admin sin Google
-uv run python manage.py runserver
+uv run python manage.py runserver   # http://localhost:8080
 ```
 
 Tareas en segundo plano en otra terminal: `uv run python manage.py qcluster`.
@@ -24,7 +24,7 @@ Tests y calidad: `uv run pytest`, `uv run ruff check .`, `uv run ruff format .`
 
 1. En Google Cloud Console, crea un OAuth client de tipo **Aplicación web** dentro del proyecto de la organización y márcalo como **Interno** en la pantalla de consentimiento.
 2. URIs de redirección autorizadas:
-   - `http://localhost:8000/accounts/google/login/callback/`
+   - `http://localhost:8080/accounts/google/login/callback/`
    - `https://interno.andronautic.com/accounts/google/login/callback/`
 3. Copia client ID y secret en `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`.
 4. `GOOGLE_WORKSPACE_DOMAINS` define qué dominios pueden entrar (separados por comas). Cualquier otra cuenta se rechaza.
